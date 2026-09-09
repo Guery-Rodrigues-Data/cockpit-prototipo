@@ -1,0 +1,6 @@
+{
+  "name": "cockpit-prototipo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Protótipo do Cockpit Operacional Semafórico (Antares / dataprom) — site estático, sem build."
+}
