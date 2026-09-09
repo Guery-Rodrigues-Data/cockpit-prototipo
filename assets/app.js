@@ -334,11 +334,128 @@ function limparCockpit() {
   if (!snapshot.length) return;
   [...instances].forEach((i) => removeWidget(i.id, { comDesfazer: false }));
   const n = snapshot.length;
-  toast(`Cockpit limpo — ${n} widget${n === 1 ? "" : "s"} removido${n === 1 ? "" : "s"}.`, {
+  toast(`Cockpit limpo, ${n} widget${n === 1 ? "" : "s"} removido${n === 1 ? "" : "s"}.`, {
     label: "Desfazer",
     fn: () => restaurarWidgets(snapshot),
   });
 }
+
+/* ---------- Telas de exemplo ----------
+   Prévia discreta do multi-tela (por enquanto ainda é 1 tela por usuário). Ficam
+   no menu do avatar e servem de vitrine: cada uma usa recursos diferentes do
+   Cockpit (integração com o Mapa, modo totais x lista, filtro por tipo/região/
+   severidade, renomear e colorir card, e até uma tela sem Mapa). Carregar uma
+   substitui o que estiver na tela. */
+const PRESETS = [
+  {
+    id: "geral",
+    nome: "Visão geral",
+    descricao: "Faixa de totais em cima (alertas, dispositivos, regiões) e o mapa em largura total embaixo.",
+    widgets: [
+      { type: "alertas", x: 0, y: 0, w: 4, h: 3, config: { titulo: "Alertas ativos", cor: "vermelho" } },
+      { type: "dispositivos", x: 4, y: 0, w: 4, h: 3, config: { titulo: "Dispositivos", cor: "azul" } },
+      { type: "regioes", x: 8, y: 0, w: 4, h: 3, config: { cor: "roxo" } },
+      { type: "mapa", x: 0, y: 3, w: 12, h: 7 },
+    ],
+  },
+  {
+    id: "alertas",
+    nome: "Plantão de alertas",
+    descricao: "Coluna à esquerda com equipamentos offline e a lista de alertas crítico/alto; o mapa, filtrado em offline, ocupa a direita.",
+    widgets: [
+      { type: "dispositivos", x: 0, y: 0, w: 5, h: 2, config: { titulo: "Equipamentos offline", cor: "amarelo", filtros: { statusConexao: "offline" } } },
+      { type: "alertas", x: 0, y: 2, w: 5, h: 7, config: { titulo: "Alertas crítico e alto", cor: "vermelho", modo: "lista", filtros: { severidades: ["Crítico", "Alto"] } } },
+      { type: "mapa", x: 5, y: 0, w: 7, h: 9, config: { filtros: { statusConexao: "offline" } } },
+    ],
+  },
+  {
+    id: "regioes",
+    nome: "Corredores e subáreas",
+    descricao: "Coluna estreita à esquerda: totais do Eixo Sul e a lista de subáreas e corredores; mapa grande à direita.",
+    widgets: [
+      { type: "dispositivos", x: 0, y: 0, w: 3, h: 3, config: { titulo: "Dispositivos do Eixo Sul", cor: "verde", filtros: { regioes: ["CR-01"] } } },
+      { type: "regioes", x: 0, y: 3, w: 3, h: 6, config: { titulo: "Subáreas e Corredores", cor: "roxo", modo: "lista" } },
+      { type: "mapa", x: 3, y: 0, w: 9, h: 10 },
+    ],
+  },
+  {
+    id: "centro",
+    nome: "Semáforos do Centro",
+    descricao: "Tela sem mapa, focada numa subárea: semáforos, câmeras e alertas.",
+    widgets: [
+      { type: "dispositivos", x: 0, y: 0, w: 4, h: 4, config: { titulo: "Semáforos do Centro", cor: "amarelo", filtros: { tipos: ["semaforo"], regioes: ["SA-01"] } } },
+      { type: "dispositivos", x: 4, y: 0, w: 8, h: 8, config: { titulo: "Câmeras do Centro", cor: "azul", modo: "lista", filtros: { tipos: ["camera"], regioes: ["SA-01"] } } },
+      { type: "alertas", x: 0, y: 4, w: 4, h: 4, config: { titulo: "Alertas do Centro", cor: "vermelho", filtros: { regioes: ["SA-01"] } } },
+    ],
+  },
+  {
+    id: "mapa",
+    nome: "Mapa em foco",
+    descricao: "Mapa grande no centro, com listas de dispositivos, alertas e regiões em volta.",
+    widgets: [
+      { type: "mapa", x: 0, y: 0, w: 8, h: 7 },
+      { type: "dispositivos", x: 8, y: 0, w: 4, h: 4, config: { titulo: "Dispositivos", cor: "azul", modo: "lista" } },
+      { type: "alertas", x: 8, y: 4, w: 4, h: 3, config: { titulo: "Alertas ativos", cor: "vermelho", modo: "lista" } },
+      { type: "regioes", x: 0, y: 7, w: 8, h: 3, config: { titulo: "Subáreas e Corredores", cor: "roxo", modo: "lista" } },
+    ],
+  },
+  {
+    id: "listas",
+    nome: "Alertas em lista",
+    descricao: "Sem mapa: equipamentos offline e todos os alertas, lado a lado em Lista Detalhada.",
+    widgets: [
+      { type: "dispositivos", x: 0, y: 0, w: 4, h: 9, config: { titulo: "Equipamentos offline", cor: "amarelo", modo: "lista", filtros: { statusConexao: "offline" } } },
+      { type: "alertas", x: 4, y: 0, w: 8, h: 9, config: { titulo: "Alertas", cor: "vermelho", modo: "lista" } },
+    ],
+  },
+  {
+    id: "alertas-mapa",
+    nome: "Alertas com mapa",
+    descricao: "Mapa e lista de dispositivos em cima; faixa de alertas ativos em Lista Detalhada ocupando a largura embaixo.",
+    widgets: [
+      { type: "mapa", x: 0, y: 0, w: 8, h: 8 },
+      { type: "dispositivos", x: 8, y: 0, w: 4, h: 8, config: { titulo: "Dispositivos", cor: "azul", modo: "lista" } },
+      { type: "alertas", x: 0, y: 8, w: 12, h: 5, config: { titulo: "Alertas ativos", cor: "vermelho", modo: "lista" } },
+    ],
+  },
+];
+
+function aplicarPreset(presetId) {
+  const preset = PRESETS.find((p) => p.id === presetId);
+  if (!preset) return;
+  // troca de tela é ação explícita: limpa sem oferecer desfazer
+  [...instances].forEach((i) => removeWidget(i.id, { comDesfazer: false }));
+  showEmptyState(false);
+  preset.widgets.forEach((w, idx) => {
+    const base = defaultConfig(w.type);
+    const ov = w.config || {};
+    const inst = {
+      id: "w-" + Date.now().toString(36) + idx + Math.random().toString(36).slice(2, 6),
+      type: w.type,
+      x: w.x, y: w.y, w: w.w, h: w.h,
+      config: { ...base, ...ov, filtros: { ...base.filtros, ...(ov.filtros || {}) } },
+    };
+    instances.push(inst);
+    mountWidget(inst, false);
+  });
+  saveLayout();
+  atualizarBibliotecaMapa();
+  toast(`Tela de exemplo "${preset.nome}" carregada.`);
+}
+
+// Dev: monta a tela, ajusta na mão (arrasta / redimensiona / configura) e chama
+// cockpitDump() no console. Ele imprime e copia pro clipboard o layout atual já
+// no formato do array `widgets` de um PRESET, pronto pra colar aqui em cima.
+window.cockpitDump = function () {
+  const widgets = instances.map((i) => ({
+    type: i.type, x: i.x, y: i.y, w: i.w, h: i.h, config: i.config,
+  }));
+  const txt = JSON.stringify(widgets, null, 2);
+  try { navigator.clipboard.writeText(txt); } catch (e) {}
+  console.log("%ccockpitDump — copiado pro clipboard:", "font-weight:bold");
+  console.log(txt);
+  return widgets;
+};
 
 // Adapta o widget a "compacto" quando fica pequeno demais pro layout padrão
 // (critério de responsividade das histórias de card — ver data-size no CSS).
@@ -371,7 +488,7 @@ function widgetMarkup(inst) {
         <div class="widget-title">${titulo}</div>
         <div class="widget-header-right">
           <div class="widget-header-actions">
-            ${inst.type !== "mapa" ? `<button type="button" class="widget-icon-btn" data-action="widget-config-open" data-id="${inst.id}" title="Configurar card">${ICONS.gear}</button>` : ""}
+            <button type="button" class="widget-icon-btn" data-action="widget-config-open" data-id="${inst.id}" title="Configurar card">${ICONS.gear}</button>
             <button type="button" class="widget-icon-btn is-danger" data-action="widget-remove" data-id="${inst.id}" title="Remover widget">${ICONS.trash}</button>
           </div>
           ${inst.type !== "mapa" ? modoToggleMarkup(inst) : ""}
@@ -453,8 +570,33 @@ function resumoFiltroCard(inst) {
   const totReg = SUBAREAS.length + CORREDORES.length;
   if (f.regioes.length >= totReg) partes.push("Todas as regiões");
   else if (f.regioes.length === 0) partes.push("Nenhuma região");
+  else if (f.regioes.length <= 2) partes.push(f.regioes.map(regiaoLabel).join(", "));
   else partes.push(`${f.regioes.length} de ${totReg} regiões`);
   return partes.join(" · ");
+}
+
+// Nome curto de uma região pra legenda do card: subárea vem como está ("Centro"),
+// corredor perde a parte descritiva depois do travessão ("Eixo Sul", não o nome inteiro).
+function regiaoLabel(id) {
+  const s = SUBAREAS.find((x) => x.id === id);
+  if (s) return s.nome;
+  const c = CORREDORES.find((x) => x.id === id);
+  return c ? c.nome.split(" — ")[0].trim() : id;
+}
+
+// Texto completo pro title (hover) do resumo: nomes inteiros das regiões
+// selecionadas quando o card está filtrado, já que a legenda encurta a lista.
+function resumoFiltroTitle(inst) {
+  const f = inst.config.filtros;
+  const totReg = SUBAREAS.length + CORREDORES.length;
+  if (!f.regioes || f.regioes.length === 0 || f.regioes.length >= totReg) return "";
+  const nomes = f.regioes.map((id) => {
+    const s = SUBAREAS.find((x) => x.id === id);
+    if (s) return s.nome;
+    const c = CORREDORES.find((x) => x.id === id);
+    return c ? c.nome : id;
+  });
+  return "Regiões: " + nomes.join(", ");
 }
 
 /* ---------- Dispositivos ---------- */
@@ -465,7 +607,7 @@ function totaisDispositivosMarkup(inst) {
     <div class="totais-body" data-action="totais-clicar" data-id="${inst.id}">
       <div class="totais-numero">${n}</div>
       <div class="totais-label">Dispositivos</div>
-      <div class="totais-filtro">${resumoFiltroCard(inst)}</div>
+      <div class="totais-filtro" title="${resumoFiltroTitle(inst)}">${resumoFiltroCard(inst)}</div>
     </div>`;
 }
 
@@ -508,7 +650,7 @@ function totaisAlertasMarkup(inst) {
       <div class="totais-breakdown">
         ${porSeveridade.map((s) => `<span class="totais-chip"><span class="totais-chip-dot" style="background:${SEVERIDADE_COR[s.sev]}"></span>${s.sev} ${s.n}</span>`).join("")}
       </div>
-      <div class="totais-filtro">${resumoFiltroCard(inst)}</div>
+      <div class="totais-filtro" title="${resumoFiltroTitle(inst)}">${resumoFiltroCard(inst)}</div>
     </div>`;
 }
 
@@ -562,7 +704,7 @@ function totaisRegioesMarkup(inst) {
         <span class="totais-chip"><span class="totais-chip-dot" style="background:var(--blue)"></span>Subáreas ${nSub}</span>
         <span class="totais-chip"><span class="totais-chip-dot" style="background:var(--purple)"></span>Corredores ${nCor}</span>
       </div>
-      <div class="totais-filtro">${resumoFiltroCard(inst)}</div>
+      <div class="totais-filtro" title="${resumoFiltroTitle(inst)}">${resumoFiltroCard(inst)}</div>
     </div>`;
 }
 
@@ -635,10 +777,12 @@ function paginacaoMarkup(id, pagina, totalPaginas, total, comVerTudo) {
 /* ---------- Mapa: markup do header (dropdowns + busca) ---------- */
 
 function mapaBodyMarkup(inst) {
-  const f = CockpitMap.getFiltro();
   const c = CockpitMap.getContagens();
+  // busca + filtros ficam sobre o mapa, como controles flutuantes (não uma
+  // segunda barra acima dele). O #mapaEl ocupa toda a área do widget.
   return `
-    <div class="map-widget-header">
+    <div id="mapaEl-${inst.id}" style="flex:1; min-height:0; position:relative;"></div>
+    <div class="map-floating-controls">
       <div class="map-search-mini">
         ${ICONS.search}
         <input type="text" data-input="map-busca" placeholder="Buscar dispositivo, corredor ou subárea..." />
@@ -647,7 +791,6 @@ function mapaBodyMarkup(inst) {
       ${filtroBtnMarkup("corredores", "Corredores", c.corredores)}
       ${filtroBtnMarkup("categorias", "Equipamentos", c.categorias)}
     </div>
-    <div id="mapaEl-${inst.id}" style="flex:1; min-height:0; position:relative;"></div>
   `;
 }
 
@@ -675,8 +818,10 @@ function dropdownConteudo(campo) {
   if (campo === "corredores") {
     return dropdownChecklist("corredores", CORREDORES, CockpitMap.getFiltro().corredores);
   }
-  // categorias: 3 seções — Categorias, Status de Alerta, Status de Conexão (critério #125167)
   const f = CockpitMap.getFiltro();
+  // categorias: só os tipos de equipamento. Conexão / "só com alerta ativo" saíram
+  // daqui e viraram config do widget (ícone de engrenagem), pra deixar a barra
+  // flutuante só com filtro de "coisa" (subárea, corredor, tipo de equipamento).
   return `
     <div class="filtros-panel-title">Categorias<div class="filtros-panel-bulk">
       <button type="button" data-action="map-bulk" data-campo="categorias" data-valor="true">Todas</button>
@@ -688,19 +833,6 @@ function dropdownConteudo(campo) {
           <input type="checkbox" data-input="map-check" data-campo="categorias" data-alvo="${c.id}" ${f.categorias.has(c.id) ? "checked" : ""}/>
           ${c.label}
         </label>`).join("")}
-    </div>
-    <div class="filtros-panel-divider"></div>
-    <div class="filtros-panel-title">Status de Alerta</div>
-    <div class="filtros-radio-row">
-      <label class="filtros-check"><input type="radio" name="mapStatusAlerta" data-input="map-status-alerta" value="todos" ${f.statusAlerta === "todos" ? "checked" : ""}/> Todos os Equipamentos</label>
-      <label class="filtros-check"><input type="radio" name="mapStatusAlerta" data-input="map-status-alerta" value="somente-ativos" ${f.statusAlerta === "somente-ativos" ? "checked" : ""}/> Somente com alertas ativos</label>
-    </div>
-    <div class="filtros-panel-divider"></div>
-    <div class="filtros-panel-title">Status de Conexão</div>
-    <div class="filtros-radio-row">
-      <label class="filtros-check"><input type="radio" name="mapStatusConexao" data-input="map-status-conexao" value="todos" ${f.statusConexao === "todos" ? "checked" : ""}/> Todos os Dispositivos</label>
-      <label class="filtros-check"><input type="radio" name="mapStatusConexao" data-input="map-status-conexao" value="online" ${f.statusConexao === "online" ? "checked" : ""}/> Somente Online</label>
-      <label class="filtros-check"><input type="radio" name="mapStatusConexao" data-input="map-status-conexao" value="offline" ${f.statusConexao === "offline" ? "checked" : ""}/> Somente Offline</label>
     </div>`;
 }
 
@@ -766,7 +898,7 @@ function openConfigModal(id) {
     f.fSubareas = f.regioes.filter((r) => subIds.includes(r));
     f.fCorredores = f.regioes.filter((r) => corIds.includes(r));
   }
-  $("#configModalTitle").textContent = `Configurar — ${WIDGET_META[inst.type].label}`;
+  $("#configModalTitle").textContent = `Configurar ${WIDGET_META[inst.type].label}`;
   $("#configModalBody").innerHTML = configModalBodyMarkup(inst.type, configDraft.config);
   $("#configModalOverlay").classList.add("is-open");
 }
@@ -784,8 +916,14 @@ function saveConfigModal() {
   }
   inst.config = configDraft.config;
   saveLayout();
-  renderWidgetTitleColor(inst.id);
-  renderWidgetBody(inst.id);
+  if (inst.type === "mapa") {
+    // não re-renderiza o body (destruiria o Leaflet); aplica direto no mapa
+    CockpitMap.setStatusConexao(inst.config.filtros.statusConexao || "todos");
+    CockpitMap.setStatusAlerta(inst.config.filtros.statusAlerta || "todos");
+  } else {
+    renderWidgetTitleColor(inst.id);
+    renderWidgetBody(inst.id);
+  }
   closeConfigModal();
   toast("Configuração salva.");
 }
@@ -833,6 +971,21 @@ function configModalBodyMarkup(type, cfg) {
   }
   if (type === "regioes") {
     return filtrosNota() + nome + cor + regioesFields(cfg);
+  }
+  if (type === "mapa") {
+    // Só o que é "estado" e não filtro de coisa: conexão e "só com alerta ativo".
+    // Subáreas / Corredores / Equipamentos seguem nos controles flutuantes do mapa.
+    const sc = cfg.filtros.statusConexao || "todos";
+    const seg = (v, txt) => `<button type="button" data-action="modal-seg" data-field="statusConexao" data-valor="${v}" class="${sc === v ? "is-active" : ""}">${txt}</button>`;
+    return `
+      <div class="field">
+        <label>Conexão</label>
+        <div class="filtros-seg">${seg("todos", "Todos")}${seg("online", "Online")}${seg("offline", "Offline")}</div>
+      </div>
+      <label class="checkbox-field">
+        <input type="checkbox" data-input="modal-check-bool" data-field="statusAlerta" data-on="somente-ativos" data-off="todos" ${(cfg.filtros.statusAlerta || "todos") === "somente-ativos" ? "checked" : ""}/>
+        Mostrar só equipamentos com alerta ativo
+      </label>`;
   }
   return nome;
 }
@@ -938,6 +1091,13 @@ document.addEventListener("click", (e) => {
   const userToggle = t.closest('[data-action="toggle-user-menu"]');
   if (userToggle) { $("#userMenuDropdown").classList.toggle("is-open"); return; }
 
+  const presetBtn = t.closest('[data-action="load-preset"]');
+  if (presetBtn) {
+    aplicarPreset(presetBtn.dataset.preset);
+    $("#userMenuDropdown").classList.remove("is-open");
+    return;
+  }
+
   if (t.closest('[data-action="clear-layout"]')) {
     limparCockpit();
     $("#userMenuDropdown").classList.remove("is-open");
@@ -1008,6 +1168,14 @@ document.addEventListener("click", (e) => {
     CockpitMap.setTodas(mapBulk.dataset.campo, mapBulk.dataset.valor === "true");
     const painel = document.querySelector(`.filtros-panel[data-filtro-panel="${mapBulk.dataset.campo}"]`);
     if (painel) painel.innerHTML = dropdownConteudo(mapBulk.dataset.campo);
+    return;
+  }
+
+  const modalSeg = t.closest('[data-action="modal-seg"]');
+  if (modalSeg) {
+    const field = modalSeg.dataset.field;
+    configDraft.config.filtros[field] = modalSeg.dataset.valor;
+    $all(`[data-action="modal-seg"][data-field="${field}"]`).forEach((b) => b.classList.toggle("is-active", b === modalSeg));
     return;
   }
 
@@ -1110,6 +1278,11 @@ document.addEventListener("input", (e) => {
   }
 
   if (t.matches('[data-input="modal-radio"], [data-input="modal-select"]')) { configDraft.config.filtros[t.dataset.field] = t.value; return; }
+
+  if (t.matches('[data-input="modal-check-bool"]')) {
+    configDraft.config.filtros[t.dataset.field] = t.checked ? t.dataset.on : t.dataset.off;
+    return;
+  }
 });
 
 document.addEventListener("change", (e) => {
@@ -1120,8 +1293,6 @@ document.addEventListener("change", (e) => {
     if (campo === "subareas") CockpitMap.toggleSubarea(alvo);
     if (campo === "corredores") CockpitMap.toggleCorredor(alvo);
   }
-  if (t.matches('[data-input="map-status-alerta"]')) CockpitMap.setStatusAlerta(t.value);
-  if (t.matches('[data-input="map-status-conexao"]')) CockpitMap.setStatusConexao(t.value);
 });
 
 document.addEventListener("keydown", (e) => {

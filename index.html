@@ -38,7 +38,37 @@
     <div class="user-menu">
       <button type="button" class="avatar" data-action="toggle-user-menu" title="Usuário">D</button>
       <div class="user-menu-dropdown" id="userMenuDropdown">
-        <button type="button" class="btn-text" data-action="clear-layout" title="Remove todos os widgets desta tela — volta ao primeiro acesso">Limpar Cockpit</button>
+        <div class="user-menu-label">Telas de exemplo</div>
+        <button type="button" class="user-menu-preset" data-action="load-preset" data-preset="geral">
+          <strong>Visão geral</strong>
+          <span>Faixa de totais em cima (alertas, dispositivos, regiões) e o mapa em largura total embaixo.</span>
+        </button>
+        <button type="button" class="user-menu-preset" data-action="load-preset" data-preset="alertas">
+          <strong>Plantão de alertas</strong>
+          <span>Equipamentos offline e a lista de alertas crítico/alto à esquerda; o mapa filtrado em offline à direita.</span>
+        </button>
+        <button type="button" class="user-menu-preset" data-action="load-preset" data-preset="regioes">
+          <strong>Corredores e subáreas</strong>
+          <span>Coluna à esquerda com totais do Eixo Sul e a lista de subáreas e corredores; mapa grande à direita.</span>
+        </button>
+        <button type="button" class="user-menu-preset" data-action="load-preset" data-preset="centro">
+          <strong>Semáforos do Centro</strong>
+          <span>Tela sem mapa, focada numa subárea: semáforos, câmeras e alertas.</span>
+        </button>
+        <button type="button" class="user-menu-preset" data-action="load-preset" data-preset="mapa">
+          <strong>Mapa em foco</strong>
+          <span>Mapa grande no centro, com listas de dispositivos, alertas e regiões em volta.</span>
+        </button>
+        <button type="button" class="user-menu-preset" data-action="load-preset" data-preset="listas">
+          <strong>Alertas em lista</strong>
+          <span>Sem mapa: equipamentos offline e todos os alertas lado a lado, em Lista Detalhada.</span>
+        </button>
+        <button type="button" class="user-menu-preset" data-action="load-preset" data-preset="alertas-mapa">
+          <strong>Alertas com mapa</strong>
+          <span>Mapa e lista de dispositivos em cima; faixa de alertas ativos em lista embaixo.</span>
+        </button>
+        <div class="user-menu-sep"></div>
+        <button type="button" class="btn-text" data-action="clear-layout" title="Remove todos os widgets desta tela, volta ao primeiro acesso">Limpar Cockpit</button>
       </div>
     </div>
   </div>
@@ -88,9 +118,26 @@
 <div class="cockpit-canvas">
   <div class="cockpit-empty" id="cockpitEmpty" hidden>
     <div class="cockpit-empty-inner">
-      <div class="cockpit-empty-icon" id="iconEmptyDashboard"></div>
       <h2>Seu Cockpit está vazio</h2>
-      <p>Monte seu painel operacional adicionando widgets pela Biblioteca — Mapa, Dispositivos, Alertas ou Subáreas e Corredores.</p>
+      <p>Você monta seu próprio painel operacional. Comece adicionando um widget e vá ajustando a tela do seu jeito.</p>
+      <div class="cockpit-empty-cards">
+        <div class="cockpit-empty-card">
+          <span class="cockpit-empty-card-icon" id="iconStep1"></span>
+          <strong>Adicione widgets</strong>
+          <span>O botão <em>Adicionar Widget</em> abre a Biblioteca: Mapa, Dispositivos, Alertas e Subáreas e Corredores. Dá pra ter vários do mesmo tipo, menos o Mapa.</span>
+        </div>
+        <div class="cockpit-empty-card">
+          <span class="cockpit-empty-card-icon" id="iconStep2"></span>
+          <strong>Organize a tela</strong>
+          <span>Arraste o card pelo cabeçalho para mover e puxe o canto inferior direito para redimensionar. Os cards se encaixam sozinhos numa grade.</span>
+        </div>
+        <div class="cockpit-empty-card">
+          <span class="cockpit-empty-card-icon" id="iconStep3"></span>
+          <strong>Configure cada card</strong>
+          <span>Na engrenagem do card você ajusta nome, cor e filtros. Clicar num total joga a seleção no widget de Mapa.</span>
+        </div>
+      </div>
+      <p class="cockpit-empty-nota">O layout e a configuração ficam salvos neste navegador, atrelados ao seu perfil. Ao voltar, a tela está como você deixou.</p>
       <button type="button" class="btn-primary" data-action="toggle-library"><span id="iconAdd2"></span>Adicionar Widget</button>
     </div>
   </div>
@@ -128,7 +175,9 @@
   document.getElementById("modalCloseBtn").innerHTML = ICONS.x;
   document.getElementById("iconAdd1").innerHTML = ICONS.plus;
   document.getElementById("iconAdd2").innerHTML = ICONS.plus;
-  document.getElementById("iconEmptyDashboard").innerHTML = ICONS.dashboard;
+  document.getElementById("iconStep1").innerHTML = ICONS.plus;
+  document.getElementById("iconStep2").innerHTML = ICONS.dashboard;
+  document.getElementById("iconStep3").innerHTML = ICONS.gear;
 </script>
 </body>
 </html>

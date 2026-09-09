@@ -94,11 +94,28 @@ a { color: inherit; }
 }
 .user-menu { position: relative; display: flex; }
 .user-menu-dropdown {
-  display: none; position: absolute; top: calc(100% + 8px); right: 0; min-width: 210px;
+  display: none; position: absolute; top: calc(100% + 8px); right: 0; width: 274px;
+  max-height: calc(100vh - 140px); overflow-y: auto;
   background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
   box-shadow: var(--shadow-md); padding: 6px; z-index: 950;
 }
 .user-menu-dropdown.is-open { display: block; }
+.user-menu-label {
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--ink-faint); padding: 6px 10px 4px;
+}
+.user-menu-preset {
+  display: block; width: 100%; text-align: left; border: none; background: none;
+  cursor: pointer; padding: 8px 10px; border-radius: 6px;
+}
+.user-menu-preset:hover { background: var(--surface-sunken); }
+.user-menu-preset strong {
+  display: block; font-family: var(--font-display); font-size: 13px; font-weight: 600; color: var(--ink);
+}
+.user-menu-preset span {
+  display: block; font-size: 11.5px; color: var(--ink-muted); line-height: 1.4; margin-top: 2px;
+}
+.user-menu-sep { height: 1px; background: var(--border); margin: 6px 4px; }
 .btn-text {
   background: none; border: none; color: var(--red); font-size: 12.5px; font-weight: 600;
   cursor: pointer; padding: 4px 0; display: block; width: 100%; text-align: left; border-radius: 6px;
@@ -236,23 +253,46 @@ a { color: inherit; }
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 24px;
+  overflow-y: auto;
 }
 .cockpit-empty[hidden] { display: none; }
 .cockpit-empty-inner {
   text-align: center;
-  max-width: 340px;
-  padding: 40px 32px;
-  border: 1.5px dashed var(--border-strong);
+  max-width: 760px;
+  padding: 34px 40px 38px;
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
+  box-shadow: var(--shadow-sm);
 }
-.cockpit-empty-icon {
-  width: 44px; height: 44px; border-radius: var(--radius-md); background: var(--red-tint); color: var(--red);
-  display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;
+.cockpit-empty-inner h2 { margin: 0 0 8px; font-family: var(--font-display); font-size: 19px; font-weight: 600; }
+.cockpit-empty-inner > p { margin: 0 auto; max-width: 500px; font-size: 14px; color: var(--ink-muted); line-height: 1.5; }
+.cockpit-empty-cards {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+  margin: 24px 0 18px;
 }
-.cockpit-empty-icon svg { width: 22px; height: 22px; }
-.cockpit-empty-inner h2 { margin: 0 0 6px; font-family: var(--font-display); font-size: 16px; font-weight: 600; }
-.cockpit-empty-inner p { margin: 0 0 18px; font-size: 13px; color: var(--ink-muted); line-height: 1.5; }
+.cockpit-empty-card {
+  border: 1px solid var(--border); border-radius: var(--radius-md);
+  background: var(--surface-sunken); padding: 18px 16px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center;
+}
+.cockpit-empty-card-icon {
+  width: 34px; height: 34px; border-radius: var(--radius-sm);
+  background: var(--red-tint); color: var(--red);
+  display: flex; align-items: center; justify-content: center; margin-bottom: 4px;
+}
+.cockpit-empty-card-icon svg { width: 18px; height: 18px; }
+.cockpit-empty-card strong {
+  font-family: var(--font-display); font-size: 15.5px; font-weight: 600; color: var(--ink);
+  margin-bottom: 7px;
+}
+.cockpit-empty-card span { font-size: 12.5px; color: var(--ink-muted); line-height: 1.5; }
+.cockpit-empty-card em { font-style: normal; font-weight: 600; color: var(--ink); }
+.cockpit-empty-nota { margin: 0 auto 24px; max-width: 540px; font-size: 12.5px; color: var(--ink-faint); line-height: 1.5; }
+@media (max-width: 640px) {
+  .cockpit-empty-cards { grid-template-columns: 1fr; }
+}
 
 /* ---------- Chrome comum dos widgets ---------- */
 
@@ -493,26 +533,33 @@ a { color: inherit; }
 
 /* ---------- Widget de Mapa ---------- */
 
-.map-widget-header {
-  flex-shrink: 0;
+.map-floating-controls {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  z-index: 1000;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
+  pointer-events: none;
 }
+.map-floating-controls > * { pointer-events: auto; }
 .map-search-mini {
-  flex: 1;
+  flex: 0 1 300px;
   min-width: 140px;
+  margin-right: auto;
   display: flex;
   align-items: center;
   gap: 6px;
-  background: var(--surface-sunken);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 6px 10px;
+  box-shadow: var(--shadow-md);
 }
+.map-filtro-btn { box-shadow: var(--shadow-md); }
 .map-search-mini svg { width: 13px; height: 13px; color: var(--ink-faint); flex-shrink: 0; }
 .map-search-mini input { flex: 1; min-width: 0; border: none; outline: none; background: none; font-size: 12px; }
 
@@ -529,7 +576,7 @@ a { color: inherit; }
 .filtros-panel {
   position: absolute;
   top: calc(100% + 6px);
-  left: 0;
+  right: 0;
   z-index: 960;
   width: 230px;
   background: var(--surface);
@@ -560,6 +607,30 @@ a { color: inherit; }
 .filtros-check input { accent-color: var(--red); width: 14px; height: 14px; cursor: pointer; flex-shrink: 0; }
 .filtros-panel-divider { height: 1px; background: var(--border); margin: 8px -14px; }
 .filtros-radio-row { display: flex; flex-direction: column; gap: 2px; }
+
+/* controle segmentado do dropdown de Status (Conexão: Todos / Online / Offline) */
+.filtros-seg {
+  display: flex;
+  margin-top: 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.filtros-seg button {
+  flex: 1;
+  border: none;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-muted);
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 6px 4px;
+  cursor: pointer;
+}
+.filtros-seg button:last-child { border-right: none; }
+.filtros-seg button:hover:not(.is-active) { background: var(--surface-sunken); }
+.filtros-seg button.is-active { background: var(--red-tint); color: var(--red); }
 
 #cockpitMap { flex: 1; min-height: 0; }
 .map-region-tooltip {
