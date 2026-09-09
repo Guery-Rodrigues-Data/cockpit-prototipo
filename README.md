@@ -30,6 +30,10 @@ powershell -ExecutionPolicy Bypass -File .\_serve.ps1
 Ou pelo [Painel de Protótipos](../prototipos-painel) (`node server.mjs`, porta 8700), que
 descobre esta pasta sozinho por ter `_serve.ps1`.
 
+Local não pede senha. No deploy da Vercel o site inteiro fica atrás de HTTP Basic Auth
+(`middleware.js`): usuário `dataprom`, senha `dat@taprom-2016`. Dá pra sobrescrever sem
+commit pelas Environment Variables `SITE_USUARIO` / `SITE_SENHA` no projeto da Vercel.
+
 ## Fora de escopo (herdado do Épico)
 
 Compartilhamento de tela entre usuários, mais de uma tela por usuário, widgets de série
