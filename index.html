@@ -13,6 +13,18 @@
 <style>
   .leaflet-container { background: #e5e5e5; font-family: var(--font-body); }
 </style>
+<!-- Microsoft Clarity (replay de sessão) — só no deploy, não roda em localhost -->
+<script>
+  (function () {
+    var h = location.hostname;
+    if (h === "localhost" || h === "127.0.0.1" || h === "") return;
+    (function(c,l,a,r,i,t,y){
+      c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+      t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+      y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    })(window, document, "clarity", "script", "yg4roru98h");
+  })();
+</script>
 </head>
 <body>
 
@@ -137,7 +149,7 @@
           <span>Na engrenagem do card você ajusta nome, cor e filtros. Clicar num total joga a seleção no widget de Mapa.</span>
         </div>
       </div>
-      <p class="cockpit-empty-nota">O layout e a configuração ficam salvos neste navegador, atrelados ao seu perfil. Ao voltar, a tela está como você deixou.</p>
+      <p class="cockpit-empty-nota">O layout e a configuração ficam salvos no seu perfil. Ao entrar de novo, em qualquer navegador, a tela está como você deixou.</p>
       <button type="button" class="btn-primary" data-action="toggle-library"><span id="iconAdd2"></span>Adicionar Widget</button>
     </div>
   </div>
