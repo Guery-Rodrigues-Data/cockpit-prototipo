@@ -1,0 +1,90 @@
+/* Modo admin (?admin): cadastro de corredor e área. Só é carregado com o modo ligado,
+   ver carregarAdmin() em app.js. Usa os tokens de style.css. */
+
+.admin-dock {
+  position: fixed; left: 16px; bottom: 16px; z-index: 900;
+  display: flex; align-items: center; gap: 4px; padding: 5px 6px 5px 14px;
+  background: var(--ink); color: #fff; border-radius: 999px; box-shadow: var(--shadow-lg);
+  font-family: var(--font-body); font-size: 12px;
+}
+.admin-dock-tag {
+  margin-right: 6px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; opacity: 0.65;
+}
+.admin-dock button {
+  display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px; border: none; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12); color: #fff; font: inherit; font-weight: 600; cursor: pointer;
+}
+.admin-dock button:hover { background: rgba(255, 255, 255, 0.22); }
+.admin-dock button.is-on { background: #fff; color: var(--ink); }
+.admin-dock button svg { width: 13px; height: 13px; }
+.admin-dock-count { opacity: 0.7; font-weight: 500; }
+
+.admin-drawbar {
+  position: fixed; left: 50%; bottom: 68px; transform: translateX(-50%); z-index: 900;
+  display: flex; align-items: center; gap: 12px; padding: 8px 10px 8px 16px;
+  background: var(--ink); color: #fff; border-radius: 999px; box-shadow: var(--shadow-lg);
+  font-family: var(--font-body); font-size: 12.5px; max-width: calc(100vw - 32px);
+}
+.admin-drawbar[hidden] { display: none; }
+.admin-drawbar strong { font-weight: 700; }
+.admin-drawbar-info { opacity: 0.8; }
+.admin-drawbar-acts { display: flex; gap: 4px; }
+.admin-drawbar button {
+  padding: 6px 12px; border: none; border-radius: 999px; background: rgba(255, 255, 255, 0.14); color: #fff;
+  font: inherit; font-weight: 600; cursor: pointer;
+}
+.admin-drawbar button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.24); }
+.admin-drawbar button:disabled { opacity: 0.4; cursor: default; }
+.admin-drawbar button[data-adm="concluir"] { background: var(--red); }
+.admin-drawbar button[data-adm="concluir"]:hover:not(:disabled) { background: var(--red-dark); }
+
+/* durante o desenho os pins e polígonos não capturam clique: todo clique vira vértice */
+.admin-desenhando, .admin-desenhando .leaflet-grab { cursor: crosshair !important; }
+.admin-desenhando .leaflet-marker-pane,
+.admin-desenhando .leaflet-overlay-pane path.leaflet-interactive { pointer-events: none !important; }
+
+.admin-lista {
+  position: fixed; left: 16px; bottom: 64px; z-index: 900; width: 340px; max-height: 60vh; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-lg);
+  font-family: var(--font-body);
+}
+.admin-lista[hidden] { display: none; }
+.admin-lista h4 {
+  margin: 0; padding: 12px 14px 6px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--ink-faint);
+}
+.admin-vazio { padding: 4px 14px 12px; font-size: 12px; color: var(--ink-faint); }
+.admin-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 14px; border-top: 1px solid var(--border); }
+.admin-row-info { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.admin-row-info strong { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-row-info span { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-faint); }
+.admin-row-acts { display: flex; gap: 2px; flex-shrink: 0; }
+.admin-row-acts button {
+  border: none; background: none; padding: 5px 7px; border-radius: var(--radius-sm); color: var(--ink-muted);
+  font: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer;
+}
+.admin-row-acts button:hover { background: var(--surface-sunken); color: var(--ink); }
+.admin-row-acts button.is-danger { color: var(--red); }
+.admin-row-acts button.is-danger:hover { background: var(--red-tint); }
+.admin-row-edit { display: flex; flex: 1; gap: 6px; align-items: center; }
+.admin-row-edit input {
+  flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  font: inherit; font-size: 12.5px;
+}
+.admin-row-edit input:focus { outline: none; border-color: var(--red); }
+
+.admin-hint { font-size: 11.5px; color: var(--ink-faint); }
+.admin-resumo { padding: 10px 12px; background: var(--surface-sunken); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 12px; color: var(--ink-muted); line-height: 1.5; }
+.admin-erro { padding: 9px 12px; background: var(--red-tint); border-radius: var(--radius-sm); font-size: 12px; color: var(--red-dark); }
+.admin-erro[hidden] { display: none; }
+
+.admin-dica { padding: 10px 14px 12px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--ink-faint); line-height: 1.4; }
+
+/* ações do admin dentro do painel lateral do Mapa (Renomear / Excluir) */
+.sel-acoes .admin-pop { flex: 1 1 100%; font-family: var(--font-body); }
+.sel-acoes .admin-pop .admin-row-acts { justify-content: flex-end; }
+.sel-acoes .admin-pop .admin-row-edit { flex-wrap: wrap; }
+
+/* o dock é fixo no canto inferior esquerdo: o canvas dos widgets termina acima dele, senão ele
+   cobriria a base do mapa (zoom e atribuição) em telas baixas */
+.modo-admin .cockpit-canvas { bottom: 72px; }

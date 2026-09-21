@@ -35,51 +35,45 @@ const CORES_CARD = [
   { id: "roxo", label: "Roxo", hex: "#7c4fd6" },
 ];
 
-const SUBAREAS = [
-  { id: "SA-01", nome: "Centro", poligono: [[-25.4270, -49.2760], [-25.4270, -49.2680], [-25.4360, -49.2680], [-25.4360, -49.2760]] },
-  { id: "SA-02", nome: "Batel", poligono: [[-25.4370, -49.2860], [-25.4370, -49.2790], [-25.4450, -49.2790], [-25.4450, -49.2860]] },
-  { id: "SA-03", nome: "Água Verde", poligono: [[-25.4460, -49.2820], [-25.4460, -49.2750], [-25.4540, -49.2750], [-25.4540, -49.2820]] },
-  { id: "SA-04", nome: "Bigorrilho", poligono: [[-25.4330, -49.2920], [-25.4330, -49.2850], [-25.4400, -49.2850], [-25.4400, -49.2920]] },
-];
+/* Sem regiões de exemplo: subáreas e corredores existem só quando cadastrados (modo ?admin,
+   ver regioes.js) e são carregados do Supabase antes da tela montar. Subárea: { id "SA-…", nome,
+   poligono [[lat,lng]…] }. Corredor: { id "CR-…", nome, linha [[lat,lng]…], raioM }. */
+const SUBAREAS = [];
+const CORREDORES = [];
 
-const CORREDORES = [
-  { id: "CR-01", nome: "Eixo Sul — Cândido de Abreu / Rui Barbosa", linha: [[-25.4210, -49.2705], [-25.4322, -49.2723], [-25.4420, -49.2740], [-25.4520, -49.2755]] },
-  { id: "CR-02", nome: "Linha Verde", linha: [[-25.4050, -49.2680], [-25.4230, -49.2700], [-25.4400, -49.2810], [-25.4600, -49.2900]] },
-  { id: "CR-03", nome: "Av. Sete de Setembro", linha: [[-25.4300, -49.2900], [-25.4322, -49.2790], [-25.4340, -49.2680], [-25.4360, -49.2600]] },
-];
-
-/* Cada equipamento carrega subareaId e/ou corredorId (pode ter os dois, ou nenhum —
-   equipamento "solto" fora de qualquer região cadastrada, caso real e válido). */
+/* subareaId / corredorId não são escritos aqui: reatribuirRegioes() (regioes.js) preenche pela
+   posição do equipamento em relação às regiões cadastradas. Equipamento fora de qualquer região
+   fica "solto", caso real e válido. */
 const EQUIPAMENTOS = [
-  { id: "SEM-1001", tipo: "semaforo", nome: "Sem. Sete de Setembro x XV de Novembro", lat: -25.4297, lng: -49.2711, subareaId: "SA-01", corredorId: "CR-03", online: true },
-  { id: "SEM-1002", tipo: "semaforo", nome: "Sem. Marechal Deodoro x Cândido de Abreu", lat: -25.4258, lng: -49.2699, subareaId: "SA-01", corredorId: "CR-01", online: true },
-  { id: "SEM-1003", tipo: "semaforo", nome: "Sem. Av. do Batel x Padre Anchieta", lat: -25.4392, lng: -49.2825, subareaId: "SA-02", corredorId: null, online: false },
-  { id: "SEM-1004", tipo: "semaforo", nome: "Sem. Água Verde x Brasílio Itiberê", lat: -25.4498, lng: -49.2780, subareaId: "SA-03", corredorId: null, online: true },
-  { id: "SEM-1005", tipo: "semaforo", nome: "Sem. Comendador Franco x Linha Verde", lat: -25.4380, lng: -49.2825, subareaId: "SA-04", corredorId: "CR-02", online: true },
-  { id: "SEM-1006", tipo: "semaforo", nome: "Sem. Sete de Setembro x Brigadeiro Franco", lat: -25.4325, lng: -49.2650, subareaId: null, corredorId: "CR-03", online: true },
-  { id: "SEM-1007", tipo: "semaforo", nome: "Sem. Rui Barbosa x Visc. de Nácar", lat: -25.4470, lng: -49.2750, subareaId: "SA-03", corredorId: "CR-01", online: false },
-  { id: "SEM-1008", tipo: "semaforo", nome: "Sem. XV de Novembro x Ébano Pereira", lat: -25.4290, lng: -49.2735, subareaId: "SA-01", corredorId: null, online: true },
+  { id: "SEM-1001", tipo: "semaforo", nome: "Sem. Sete de Setembro x XV de Novembro", lat: -25.4297, lng: -49.2711, online: true },
+  { id: "SEM-1002", tipo: "semaforo", nome: "Sem. Marechal Deodoro x Cândido de Abreu", lat: -25.4258, lng: -49.2699, online: true },
+  { id: "SEM-1003", tipo: "semaforo", nome: "Sem. Av. do Batel x Padre Anchieta", lat: -25.4392, lng: -49.2825, online: false },
+  { id: "SEM-1004", tipo: "semaforo", nome: "Sem. Água Verde x Brasílio Itiberê", lat: -25.4498, lng: -49.2780, online: true },
+  { id: "SEM-1005", tipo: "semaforo", nome: "Sem. Comendador Franco x Linha Verde", lat: -25.4380, lng: -49.2825, online: true },
+  { id: "SEM-1006", tipo: "semaforo", nome: "Sem. Sete de Setembro x Brigadeiro Franco", lat: -25.4325, lng: -49.2650, online: true },
+  { id: "SEM-1007", tipo: "semaforo", nome: "Sem. Rui Barbosa x Visc. de Nácar", lat: -25.4470, lng: -49.2750, online: false },
+  { id: "SEM-1008", tipo: "semaforo", nome: "Sem. XV de Novembro x Ébano Pereira", lat: -25.4290, lng: -49.2735, online: true },
 
-  { id: "CAM-2001", tipo: "camera", nome: "Câm. Praça Tiradentes", lat: -25.4285, lng: -49.2705, subareaId: "SA-01", corredorId: null, online: true },
-  { id: "CAM-2002", tipo: "camera", nome: "Câm. Av. do Batel 1200", lat: -25.4405, lng: -49.2810, subareaId: "SA-02", corredorId: null, online: true },
-  { id: "CAM-2003", tipo: "camera", nome: "Câm. Shopping Água Verde", lat: -25.4510, lng: -49.2790, subareaId: "SA-03", corredorId: null, online: false },
-  { id: "CAM-2004", tipo: "camera", nome: "Câm. Linha Verde km 4", lat: -25.4420, lng: -49.2850, subareaId: "SA-04", corredorId: "CR-02", online: true },
-  { id: "CAM-2005", tipo: "camera", nome: "Câm. Rui Barbosa 800", lat: -25.4380, lng: -49.2745, subareaId: null, corredorId: "CR-01", online: true },
-  { id: "CAM-2006", tipo: "camera", nome: "Câm. Praça Osório", lat: -25.4305, lng: -49.2725, subareaId: "SA-01", corredorId: null, online: true },
+  { id: "CAM-2001", tipo: "camera", nome: "Câm. Praça Tiradentes", lat: -25.4285, lng: -49.2705, online: true },
+  { id: "CAM-2002", tipo: "camera", nome: "Câm. Av. do Batel 1200", lat: -25.4405, lng: -49.2810, online: true },
+  { id: "CAM-2003", tipo: "camera", nome: "Câm. Shopping Água Verde", lat: -25.4510, lng: -49.2790, online: false },
+  { id: "CAM-2004", tipo: "camera", nome: "Câm. Linha Verde km 4", lat: -25.4420, lng: -49.2850, online: true },
+  { id: "CAM-2005", tipo: "camera", nome: "Câm. Rui Barbosa 800", lat: -25.4380, lng: -49.2745, online: true },
+  { id: "CAM-2006", tipo: "camera", nome: "Câm. Praça Osório", lat: -25.4305, lng: -49.2725, online: true },
 
-  { id: "RAD-3001", tipo: "radar", nome: "Radar Rui Barbosa km 2", lat: -25.4440, lng: -49.2748, subareaId: "SA-03", corredorId: "CR-01", online: true },
-  { id: "RAD-3002", tipo: "radar", nome: "Radar Sete de Setembro 3400", lat: -25.4350, lng: -49.2620, subareaId: null, corredorId: "CR-03", online: true },
-  { id: "RAD-3003", tipo: "radar", nome: "Radar Linha Verde km 8", lat: -25.4550, lng: -49.2880, subareaId: null, corredorId: "CR-02", online: false },
-  { id: "RAD-3004", tipo: "radar", nome: "Radar Cândido de Abreu", lat: -25.4230, lng: -49.2700, subareaId: "SA-01", corredorId: "CR-01", online: true },
+  { id: "RAD-3001", tipo: "radar", nome: "Radar Rui Barbosa km 2", lat: -25.4440, lng: -49.2748, online: true },
+  { id: "RAD-3002", tipo: "radar", nome: "Radar Sete de Setembro 3400", lat: -25.4350, lng: -49.2620, online: true },
+  { id: "RAD-3003", tipo: "radar", nome: "Radar Linha Verde km 8", lat: -25.4550, lng: -49.2880, online: false },
+  { id: "RAD-3004", tipo: "radar", nome: "Radar Cândido de Abreu", lat: -25.4230, lng: -49.2700, online: true },
 
-  { id: "NOB-4001", tipo: "nobreak", nome: "Nobreak Gabinete Centro 04", lat: -25.4300, lng: -49.2740, subareaId: "SA-01", corredorId: null, online: true },
-  { id: "NOB-4002", tipo: "nobreak", nome: "Nobreak Gabinete Batel 02", lat: -25.4398, lng: -49.2830, subareaId: "SA-02", corredorId: null, online: false },
-  { id: "NOB-4003", tipo: "nobreak", nome: "Nobreak Gabinete Água Verde 01", lat: -25.4495, lng: -49.2800, subareaId: "SA-03", corredorId: null, online: true },
-  { id: "NOB-4004", tipo: "nobreak", nome: "Nobreak Gabinete Bigorrilho 03", lat: -25.4365, lng: -49.2880, subareaId: "SA-04", corredorId: null, online: true },
+  { id: "NOB-4001", tipo: "nobreak", nome: "Nobreak Gabinete Centro 04", lat: -25.4300, lng: -49.2740, online: true },
+  { id: "NOB-4002", tipo: "nobreak", nome: "Nobreak Gabinete Batel 02", lat: -25.4398, lng: -49.2830, online: false },
+  { id: "NOB-4003", tipo: "nobreak", nome: "Nobreak Gabinete Água Verde 01", lat: -25.4495, lng: -49.2800, online: true },
+  { id: "NOB-4004", tipo: "nobreak", nome: "Nobreak Gabinete Bigorrilho 03", lat: -25.4365, lng: -49.2880, online: true },
 
-  { id: "PLU-5001", tipo: "pluviometro", nome: "Pluviômetro Centro Cívico", lat: -25.4210, lng: -49.2705, subareaId: null, corredorId: "CR-01", online: true },
-  { id: "PLU-5002", tipo: "pluviometro", nome: "Pluviômetro Água Verde", lat: -25.4530, lng: -49.2765, subareaId: "SA-03", corredorId: null, online: true },
-  { id: "PLU-5003", tipo: "pluviometro", nome: "Pluviômetro Bigorrilho", lat: -25.4340, lng: -49.2905, subareaId: "SA-04", corredorId: null, online: false },
+  { id: "PLU-5001", tipo: "pluviometro", nome: "Pluviômetro Centro Cívico", lat: -25.4210, lng: -49.2705, online: true },
+  { id: "PLU-5002", tipo: "pluviometro", nome: "Pluviômetro Água Verde", lat: -25.4530, lng: -49.2765, online: true },
+  { id: "PLU-5003", tipo: "pluviometro", nome: "Pluviômetro Bigorrilho", lat: -25.4340, lng: -49.2905, online: false },
 ];
 
 /* Alertas referenciam um equipamentoId existente. Nem todo equipamento offline tem

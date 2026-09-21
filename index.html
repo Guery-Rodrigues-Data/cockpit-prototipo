@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
 <link rel="stylesheet" href="https://unpkg.com/gridstack@9.5.1/dist/gridstack.min.css" />
 <link rel="stylesheet" href="assets/style.css" />
 <style>
@@ -51,6 +52,10 @@
       <button type="button" class="avatar" data-action="toggle-user-menu" title="Usuário">D</button>
       <div class="user-menu-dropdown" id="userMenuDropdown">
         <div class="user-menu-label">Telas de exemplo</div>
+        <button type="button" class="user-menu-preset" data-action="load-preset" data-preset="inicial">
+          <strong>Tela inicial</strong>
+          <span>Lista de subáreas e corredores à esquerda e o mapa grande à direita. É a tela do primeiro acesso.</span>
+        </button>
         <button type="button" class="user-menu-preset" data-action="load-preset" data-preset="geral">
           <strong>Visão geral</strong>
           <span>Faixa de totais em cima (alertas, dispositivos, regiões) e o mapa em largura total embaixo.</span>
@@ -61,11 +66,11 @@
         </button>
         <button type="button" class="user-menu-preset" data-action="load-preset" data-preset="regioes">
           <strong>Corredores e subáreas</strong>
-          <span>Coluna à esquerda com totais do Eixo Sul e a lista de subáreas e corredores; mapa grande à direita.</span>
+          <span>Coluna à esquerda com totais de dispositivos e a lista de subáreas e corredores; mapa grande à direita.</span>
         </button>
         <button type="button" class="user-menu-preset" data-action="load-preset" data-preset="centro">
-          <strong>Semáforos do Centro</strong>
-          <span>Tela sem mapa, focada numa subárea: semáforos, câmeras e alertas.</span>
+          <strong>Semáforos e câmeras</strong>
+          <span>Tela sem mapa: totais de semáforos, lista de câmeras e alertas.</span>
         </button>
         <button type="button" class="user-menu-preset" data-action="load-preset" data-preset="mapa">
           <strong>Mapa em foco</strong>
@@ -88,8 +93,13 @@
 
 <div class="cockpit-toolbar">
   <div class="cockpit-toolbar-title">
-    Cockpit
-    <span>Painel operacional, Curitiba</span>
+    <div class="cockpit-breadcrumb">
+      <a class="cockpit-breadcrumb-home" href="index.html" title="Início" aria-label="Início">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/></svg>
+      </a>
+      <svg class="cockpit-breadcrumb-sep" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 7 5 5-5 5"/><path d="m13 7 5 5-5 5"/></svg>
+      <div class="cockpit-breadcrumb-atual">Cockpit</div>
+    </div>
   </div>
   <div class="widget-library-wrap">
     <button type="button" class="btn-primary" data-action="toggle-library"><span id="iconAdd1"></span>Adicionar Widget</button>
@@ -173,11 +183,16 @@
 <div class="toast" id="toast"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="https://unpkg.com/gridstack@9.5.1/dist/gridstack-all.js"></script>
 <script src="assets/data.js"></script>
 <script src="assets/state.js"></script>
+<script src="assets/controladores.js"></script>
+<script src="assets/regioes.js"></script>
 <script src="assets/map.js"></script>
 <script src="assets/app.js"></script>
+<script src="assets/painel-controlador.js"></script>
+<script src="assets/painel-selecao.js"></script>
 <script>
   // ícones que precisam do objeto ICONS (definido em app.js) já carregado
   document.getElementById("libIconMapa").innerHTML = ICONS.mapPin;

@@ -50,6 +50,7 @@ function defaultConfig(type) {
           categorias: CATEGORIAS_EQUIPAMENTO.map((c) => c.id),
           statusAlerta: "todos",
           statusConexao: "todos",
+          soProblemas: false,
         },
       };
     case "dispositivos":
@@ -135,6 +136,15 @@ function notImplemented(label) {
 
 /* ---------- persistência ---------- */
 
+// Primeiro acesso = a chave do layout ainda não existe (layout vazio salvo NÃO conta).
+function primeiroAcesso() {
+  try {
+    return localStorage.getItem(STORAGE_KEY) === null;
+  } catch (e) {
+    return false; // sem localStorage não dá para saber; mantém a tela vazia
+  }
+}
+
 function loadLayout() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -164,6 +174,15 @@ const CockpitBus = {
   focarRegiao(tipo, id) {
     if (!this.mapaAtivo()) return;
     CockpitMap.focarRegiao(tipo, id);
+    scrollToWidget(instances.find((i) => i.type === "mapa").id);
+  },
+  // Clique numa linha da lista de Regiões: abre o painel lateral com os dados da região, filtra
+  // o mapa só por ela e a enquadra. Cliques seguintes trocam a região do painel e do filtro.
+  selecionarRegiao(tipo, id) {
+    if (!this.mapaAtivo()) return;
+    CockpitMap.focarRegiao(tipo, id, { enquadrar: false });
+    CockpitMap.selecionarRegiao(tipo, id);
+    CockpitMap.enquadrarSelecao();
     scrollToWidget(instances.find((i) => i.type === "mapa").id);
   },
 };
@@ -240,14 +259,103 @@ function initGrid() {
     aplicarTamanhoResponsivo(id);
   });
 
+  const primeira = primeiroAcesso(); // antes de reconciliarRegioes(), que grava o layout (mesmo vazio)
   const saved = loadLayout();
-  if (saved.length === 0) {
+  instances = saved;
+  reconciliarRegioes();
+  if (primeira) {
+    // nunca salvou nada neste navegador: abre a Tela inicial. Quem limpar a tela depois cai
+    // na tela vazia normalmente (aí o layout salvo existe, só que vazio).
+    showEmptyState(false);
+    montarWidgetsDoPreset(PRESETS.find((p) => p.id === "inicial"));
+    saveLayout();
+  } else if (saved.length === 0) {
     showEmptyState(true);
   } else {
-    instances = saved;
     instances.forEach((inst) => mountWidget(inst, false));
     showEmptyState(false);
   }
+}
+
+/* ---------- regiões cadastradas x filtros já salvos ---------- */
+
+// Filtros salvos no localStorage guardam ids de região. Região cadastrada depois (por
+// mim em outro navegador, ou pelo ?admin) não está neles e ficaria "desmarcada" para
+// sempre, escondida do mapa e sem como clicar nela. Cada widget guarda em `regioesVistas`
+// os ids que já viu: id novo entra marcado; id que sumiu do banco é tirado; o que o
+// usuário desmarcou de propósito continua desmarcado.
+// `regioesVistas` mora DENTRO do widget (e não numa chave à parte do localStorage) para ser
+// gravada na mesma escrita do filtro. Duas chaves separadas saíam de sincronia quando
+// outra aba escrevia por cima do layout: o id ficava "visto" sem nunca ter entrado no filtro.
+function reconciliarRegioes() {
+  const atuais = new Set(todasRegioesIds());
+  localStorage.removeItem("cockpitRegioesConhecidasV1"); // chave da versão anterior (ver acima)
+
+  instances.forEach((inst) => {
+    const f = inst.config && inst.config.filtros;
+    if (!f) return;
+    // widget salvo antes deste campo existir (ou criado por outra via): nada visto ainda,
+    // então toda região que faltar no filtro entra. Corrige o filtro que ficou sem regiões.
+    const vistas = new Set(inst.regioesVistas || []);
+    const novas = [...atuais].filter((id) => !vistas.has(id));
+    ["regioes", "subareas", "corredores"].forEach((campo) => {
+      if (!Array.isArray(f[campo])) return;
+      f[campo] = f[campo].filter((id) => atuais.has(id));
+      novas.forEach((id) => {
+        const cabe = campo === "regioes" || (campo === "subareas" ? id.startsWith("SA-") : id.startsWith("CR-"));
+        if (cabe && !f[campo].includes(id)) f[campo].push(id);
+      });
+    });
+    inst.regioesVistas = [...atuais];
+  });
+
+  saveLayout();
+}
+
+// Chamado pelo modo admin depois de cadastrar/renomear/excluir uma região.
+function aoMudarRegioes() {
+  reatribuirRegioes();
+  reconciliarRegioes();
+  const mapa = instances.find((i) => i.type === "mapa");
+  if (mapa) {
+    CockpitMap.setFiltroRegioes(mapa.config.filtros.subareas, mapa.config.filtros.corredores);
+    ["subareas", "corredores"].forEach((campo) => {
+      const painel = document.querySelector(`[data-filtro-panel="${campo}"]`);
+      if (painel) painel.innerHTML = dropdownConteudo(campo);
+    });
+  }
+  instances.forEach((inst) => {
+    if (inst.type !== "mapa") renderWidgetBody(inst.id);
+  });
+}
+
+/* ---------- modo admin (cadastro de corredor/área, escondido) ---------- */
+
+// Abrir o Cockpit com ?admin liga (e o navegador lembra); ?admin=0 desliga. Sem isso
+// nenhum controle de cadastro chega a ser carregado.
+const ADMIN_KEY = "cockpitAdminV1";
+
+function adminAtivo() {
+  const params = new URLSearchParams(location.search);
+  try {
+    if (params.has("admin")) {
+      if (params.get("admin") === "0") localStorage.removeItem(ADMIN_KEY);
+      else localStorage.setItem(ADMIN_KEY, "1");
+    }
+    return localStorage.getItem(ADMIN_KEY) === "1";
+  } catch (e) {
+    return params.has("admin") && params.get("admin") !== "0";
+  }
+}
+
+function carregarAdmin() {
+  const css = document.createElement("link");
+  css.rel = "stylesheet";
+  css.href = "assets/admin.css";
+  document.head.appendChild(css);
+  const js = document.createElement("script");
+  js.src = "assets/admin.js";
+  document.body.appendChild(js);
 }
 
 function showEmptyState(show) {
@@ -263,7 +371,7 @@ function addWidget(type) {
   }
   const id = "w-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const size = defaultSize(type);
-  const inst = { id, type, x: null, y: null, w: size.w, h: size.h, config: defaultConfig(type) };
+  const inst = { id, type, x: null, y: null, w: size.w, h: size.h, config: defaultConfig(type), regioesVistas: todasRegioesIds() };
   instances.push(inst);
   showEmptyState(false);
   mountWidget(inst, true);
@@ -348,6 +456,15 @@ function limparCockpit() {
    substitui o que estiver na tela. */
 const PRESETS = [
   {
+    id: "inicial",
+    nome: "Tela inicial",
+    descricao: "Lista de subáreas e corredores à esquerda e o mapa grande à direita. É a tela do primeiro acesso.",
+    widgets: [
+      { type: "mapa", x: 4, y: 0, w: 8, h: 8 },
+      { type: "regioes", x: 0, y: 0, w: 4, h: 8, config: { cor: "roxo", modo: "lista" } },
+    ],
+  },
+  {
     id: "geral",
     nome: "Visão geral",
     descricao: "Faixa de totais em cima (alertas, dispositivos, regiões) e o mapa em largura total embaixo.",
@@ -371,21 +488,21 @@ const PRESETS = [
   {
     id: "regioes",
     nome: "Corredores e subáreas",
-    descricao: "Coluna estreita à esquerda: totais do Eixo Sul e a lista de subáreas e corredores; mapa grande à direita.",
+    descricao: "Coluna estreita à esquerda: totais de dispositivos e a lista de subáreas e corredores; mapa grande à direita.",
     widgets: [
-      { type: "dispositivos", x: 0, y: 0, w: 3, h: 3, config: { titulo: "Dispositivos do Eixo Sul", cor: "verde", filtros: { regioes: ["CR-01"] } } },
+      { type: "dispositivos", x: 0, y: 0, w: 3, h: 3, config: { titulo: "Dispositivos", cor: "verde" } },
       { type: "regioes", x: 0, y: 3, w: 3, h: 6, config: { titulo: "Subáreas e Corredores", cor: "roxo", modo: "lista" } },
       { type: "mapa", x: 3, y: 0, w: 9, h: 10 },
     ],
   },
   {
     id: "centro",
-    nome: "Semáforos do Centro",
-    descricao: "Tela sem mapa, focada numa subárea: semáforos, câmeras e alertas.",
+    nome: "Semáforos e câmeras",
+    descricao: "Tela sem mapa: totais de semáforos, lista de câmeras e alertas.",
     widgets: [
-      { type: "dispositivos", x: 0, y: 0, w: 4, h: 4, config: { titulo: "Semáforos do Centro", cor: "amarelo", filtros: { tipos: ["semaforo"], regioes: ["SA-01"] } } },
-      { type: "dispositivos", x: 4, y: 0, w: 8, h: 8, config: { titulo: "Câmeras do Centro", cor: "azul", modo: "lista", filtros: { tipos: ["camera"], regioes: ["SA-01"] } } },
-      { type: "alertas", x: 0, y: 4, w: 4, h: 4, config: { titulo: "Alertas do Centro", cor: "vermelho", filtros: { regioes: ["SA-01"] } } },
+      { type: "dispositivos", x: 0, y: 0, w: 4, h: 4, config: { titulo: "Semáforos", cor: "amarelo", filtros: { tipos: ["semaforo"] } } },
+      { type: "dispositivos", x: 4, y: 0, w: 8, h: 8, config: { titulo: "Câmeras", cor: "azul", modo: "lista", filtros: { tipos: ["camera"] } } },
+      { type: "alertas", x: 0, y: 4, w: 4, h: 4, config: { titulo: "Alertas", cor: "vermelho" } },
     ],
   },
   {
@@ -426,6 +543,15 @@ function aplicarPreset(presetId) {
   // troca de tela é ação explícita: limpa sem oferecer desfazer
   [...instances].forEach((i) => removeWidget(i.id, { comDesfazer: false }));
   showEmptyState(false);
+  montarWidgetsDoPreset(preset);
+  saveLayout();
+  atualizarBibliotecaMapa();
+  toast(`Tela de exemplo "${preset.nome}" carregada.`);
+}
+
+// Cria e monta os widgets de um preset. Filtros de região vêm do defaultConfig (todas as
+// regiões cadastradas), então a tela acompanha regiões novas em vez de guardar ids.
+function montarWidgetsDoPreset(preset) {
   preset.widgets.forEach((w, idx) => {
     const base = defaultConfig(w.type);
     const ov = w.config || {};
@@ -434,13 +560,11 @@ function aplicarPreset(presetId) {
       type: w.type,
       x: w.x, y: w.y, w: w.w, h: w.h,
       config: { ...base, ...ov, filtros: { ...base.filtros, ...(ov.filtros || {}) } },
+      regioesVistas: todasRegioesIds(),
     };
     instances.push(inst);
     mountWidget(inst, false);
   });
-  saveLayout();
-  atualizarBibliotecaMapa();
-  toast(`Tela de exemplo "${preset.nome}" carregada.`);
 }
 
 // Dev: monta a tela, ajusta na mão (arrasta / redimensiona / configura) e chama
@@ -576,7 +700,7 @@ function resumoFiltroCard(inst) {
 }
 
 // Nome curto de uma região pra legenda do card: subárea vem como está ("Centro"),
-// corredor perde a parte descritiva depois do travessão ("Eixo Sul", não o nome inteiro).
+// corredor perde a parte descritiva depois do travessão ("Av. X — trecho Y" vira "Av. X").
 function regiaoLabel(id) {
   const s = SUBAREAS.find((x) => x.id === id);
   if (s) return s.nome;
@@ -708,6 +832,11 @@ function totaisRegioesMarkup(inst) {
     </div>`;
 }
 
+function linhaSelecionada(tipo, id) {
+  const sel = CockpitMap.getSelecao();
+  return !!sel && sel.tipo === tipo && sel.id === id;
+}
+
 function listaRegioesMarkup(inst) {
   const ids = inst.config.filtros.regioes;
   const tab = inst.config.listaTab || "subareas";
@@ -718,20 +847,20 @@ function listaRegioesMarkup(inst) {
   const tipoAlvo = tab === "subareas" ? "subarea" : "corredor";
 
   return `
-    <div class="lista-toolbar">
+    <div class="lista-toolbar is-empilhada">
+      ${buscaMarkup(inst.id)}
       <div class="lista-tabs">
         <button type="button" class="lista-tab ${tab === "subareas" ? "is-active" : ""}" data-action="lista-tab" data-id="${inst.id}" data-tab="subareas">Subáreas</button>
         <button type="button" class="lista-tab ${tab === "corredores" ? "is-active" : ""}" data-action="lista-tab" data-id="${inst.id}" data-tab="corredores">Corredores</button>
       </div>
-      ${buscaMarkup(inst.id)}
     </div>
-    <div class="lista-scroll">
+    <div class="lista-scroll is-recuada">
       ${itens.length === 0 ? `<div class="lista-vazio">Nenhuma região encontrada.</div>` : `
       <table class="lista-tabela">
         <thead><tr><th>${tab === "subareas" ? "Subárea" : "Corredor"}</th></tr></thead>
         <tbody>
           ${itens.map((r) => `
-            <tr data-action="lista-row" data-id="${inst.id}" data-tipo="${tipoAlvo}" data-alvo="${r.id}">
+            <tr class="${linhaSelecionada(tipoAlvo, r.id) ? "is-selecionada" : ""}" data-action="lista-row" data-id="${inst.id}" data-tipo="${tipoAlvo}" data-alvo="${r.id}">
               <td><strong>${r.nome}</strong><span class="id-mono">${r.id}</span></td>
             </tr>`).join("")}
         </tbody>
@@ -787,10 +916,15 @@ function mapaBodyMarkup(inst) {
         ${ICONS.search}
         <input type="text" data-input="map-busca" placeholder="Buscar dispositivo, corredor ou subárea..." />
       </div>
+      <button type="button" class="map-toggle" data-action="map-so-problemas" aria-pressed="${!!inst.config.filtros.soProblemas}" title="Mostrar só dispositivos offline ou com alerta ativo">
+        <span class="map-toggle-trilho"><span class="map-toggle-bola"></span></span>
+        Só problemas <span class="map-toggle-n" data-map-problemas>${c.problemas}</span>
+      </button>
       ${filtroBtnMarkup("subareas", "Subáreas", c.subareas)}
       ${filtroBtnMarkup("corredores", "Corredores", c.corredores)}
       ${filtroBtnMarkup("categorias", "Equipamentos", c.categorias)}
     </div>
+    <aside class="map-selecao" hidden></aside>
   `;
 }
 
@@ -860,6 +994,11 @@ function atualizarCabecalhoMapa({ contagens, focoLabel, filtroSerializado }) {
   if (filtroSerializado) {
     inst.config.filtros = filtroSerializado;
     saveLayout();
+  }
+  const toggleProblemas = document.querySelector('[data-action="map-so-problemas"]');
+  if (toggleProblemas) {
+    toggleProblemas.setAttribute("aria-pressed", String(!!(filtroSerializado && filtroSerializado.soProblemas)));
+    toggleProblemas.querySelector("[data-map-problemas]").textContent = contagens.problemas;
   }
   ["subareas", "corredores", "categorias"].forEach((campo) => {
     const btn = document.querySelector(`.map-filtro-btn[data-campo="${campo}"]`);
@@ -1138,7 +1277,7 @@ document.addEventListener("click", (e) => {
     if (!CockpitBus.mapaAtivo()) { toast("Adicione um widget de Mapa nesta tela para localizar no mapa."); return; }
     const tipo = listaRow.dataset.tipo, alvo = listaRow.dataset.alvo;
     if (tipo === "equipamento") CockpitBus.focarEquipamento(alvo);
-    else CockpitBus.focarRegiao(tipo, alvo);
+    else CockpitBus.selecionarRegiao(tipo, alvo);
     return;
   }
 
@@ -1160,6 +1299,11 @@ document.addEventListener("click", (e) => {
     const jaAberto = painel.classList.contains("is-open");
     $all(".filtros-panel").forEach((p) => p.classList.remove("is-open"));
     if (!jaAberto) { painel.innerHTML = dropdownConteudo(campo); painel.classList.add("is-open"); }
+    return;
+  }
+
+  if (t.closest('[data-action="map-so-problemas"]')) {
+    CockpitMap.setSoProblemas(!CockpitMap.getFiltro().soProblemas);
     return;
   }
 
@@ -1304,8 +1448,27 @@ document.addEventListener("keydown", (e) => {
 
 /* ---------- boot ---------- */
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+  // Os widgets nascem já com os semáforos reais e as regiões cadastradas do Supabase.
+  // Cada leitura falha sozinha: sem controladores mostra os de exemplo de data.js, sem
+  // regiões cadastradas mostra só as de exemplo, e avisa.
+  const [regioes, controladores] = await Promise.allSettled([buscarRegioesCadastradas(), buscarControladores()]);
+  const avisos = [];
+  if (regioes.status === "fulfilled") aplicarRegioesCadastradas(regioes.value);
+  else {
+    console.warn("[Cockpit] regiões cadastradas indisponíveis:", regioes.reason);
+    avisos.push("as regiões cadastradas");
+  }
+  if (controladores.status === "fulfilled") {
+    LiveState.substituirEquipamentosDoTipo("semaforo", montarSemaforos(controladores.value));
+  } else {
+    console.warn("[Cockpit] controladores do Supabase indisponíveis:", controladores.reason);
+    avisos.push("os controladores");
+  }
+  reatribuirRegioes();
   initGrid();
+  if (avisos.length) toast(`Não foi possível ler ${avisos.join(" e ")} do banco. Mostrando só os dados de exemplo.`);
+  if (adminAtivo()) carregarAdmin();
   LiveState.start(6000);
   // Card Totais reflete o "tempo real" sozinho (critério das 3 histórias). A Lista
   // Detalhada só atualiza quando o operador interage (busca/pagina/troca aba) pra

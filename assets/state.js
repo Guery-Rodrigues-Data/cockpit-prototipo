@@ -44,11 +44,20 @@ const LiveState = (() => {
   // A cada ciclo alterna a conexão de 1 equipamento e, quando ele cai, abre um
   // alerta crítico de comunicação (fecha de novo quando reconecta) — o bastante
   // pra qualquer widget aberto mostrar número mudando sem ação do operador.
+  //
+  // Com centenas de equipamentos, virar um aleatório a cada tick faria a fração offline
+  // subir até ~50% em poucos minutos; por isso o offline fica em torno de 3%: acima do
+  // limite só reconecta, abaixo dele derruba na maior parte das vezes.
   function tick() {
     if (equipamentos.length === 0) return;
-    const idx = Math.floor(Math.random() * equipamentos.length);
-    const atualizado = { ...equipamentos[idx], online: !equipamentos[idx].online };
-    equipamentos = equipamentos.map((e, i) => (i === idx ? atualizado : e));
+    const offline = equipamentos.filter((e) => !e.online);
+    const limiteOffline = Math.max(4, Math.round(equipamentos.length * 0.03));
+    const reconectar = offline.length > 0 && (offline.length >= limiteOffline || Math.random() < 0.35);
+    const candidatos = reconectar ? offline : equipamentos.filter((e) => e.online);
+    if (candidatos.length === 0) return;
+    const alvo = candidatos[Math.floor(Math.random() * candidatos.length)];
+    const atualizado = { ...alvo, online: !alvo.online };
+    equipamentos = equipamentos.map((e) => (e.id === alvo.id ? atualizado : e));
 
     if (!atualizado.online) {
       const jaTemAlerta = alertas.some(
@@ -81,5 +90,23 @@ const LiveState = (() => {
     intervalId = setInterval(tick, periodoMs || 6000);
   }
 
-  return { subscribe, getEquipamentos, getAlertas, equipamentoPorId, alertasDoEquipamento, start };
+  // Troca todos os equipamentos de um tipo (ex.: semáforos de exemplo pelos reais do
+  // banco). Alertas de equipamento que deixou de existir saem junto.
+  function substituirEquipamentosDoTipo(tipo, novos) {
+    equipamentos = [...equipamentos.filter((e) => e.tipo !== tipo), ...novos];
+    const ids = new Set(equipamentos.map((e) => e.id));
+    alertas = alertas.filter((a) => ids.has(a.equipamentoId));
+    notify();
+  }
+
+  return {
+    subscribe,
+    notificar: notify,
+    getEquipamentos,
+    getAlertas,
+    equipamentoPorId,
+    alertasDoEquipamento,
+    substituirEquipamentosDoTipo,
+    start,
+  };
 })();

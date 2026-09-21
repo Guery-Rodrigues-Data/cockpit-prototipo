@@ -11,14 +11,28 @@ navegador (simula "atrelado ao perfil do usuário").
 
 | História | O que cobre no protótipo |
 |---|---|
-| #125012 (Épico) | Grid com adicionar/mover/redimensionar/remover, múltiplas instâncias (exceto Mapa), 1ª tela vazia |
+| #125012 (Épico) | Grid com adicionar/mover/redimensionar/remover, múltiplas instâncias (exceto Mapa). O 1º acesso abre a "Tela inicial" (lista de regiões + mapa); a tela vazia com o passo a passo aparece depois de limpar o painel |
 | #125167 — Widget de Mapa | Instância única, filtros Subáreas/Corredores/Equipamentos (dropdown + busca + Todas/Limpar), busca livre com destaque+zoom, status ao vivo |
 | #125168 — Widget de Dispositivos | Card Totais / Lista Detalhada, config (nome/cor/filtros), integração com o Mapa |
 | #125169 — Widget de Alertas | Totais por severidade / Lista Detalhada com busca+paginação, "Ver tudo" (fora de escopo aqui), integração com o Mapa |
 | #128628 — Widget de Regiões | Totais Subáreas+Corredores / Lista em abas, integração com o Mapa |
 
 "Tempo real" é simulado: a cada ~6s um equipamento aleatório troca de status (e abre/fecha
-um alerta de comunicação), refletindo nos widgets já abertos sem ação do operador.
+um alerta de comunicação), refletindo nos widgets já abertos sem ação do operador. O número de
+equipamentos offline fica em torno de 3%, para a simulação não degradar com ~1000 semáforos.
+
+## Dados do Supabase
+
+Os semáforos vêm da tabela `controladores` do mesmo Supabase do `croqui-prototipo` (id, via e
+posição; status e alertas seguem simulados). Sem resposta do banco, o Cockpit mostra os semáforos
+de exemplo de `data.js` e avisa. Câmeras, radares, nobreaks e pluviômetros continuam de exemplo.
+
+Não há subáreas nem corredores de exemplo: eles existem só quando cadastrados. O cadastro fica
+escondido: abrir o Cockpit com `?admin` (uma vez; `?admin=0` desliga) mostra o dock **Admin** para
+desenhar corredor (linha no mapa + alcance em metros) e área (polígono), renomear e excluir. As
+regiões ficam nas tabelas `cockpit_corredores` e `cockpit_areas` (`supabase/regioes.sql`, rodar
+uma vez no SQL Editor). Pertencer a uma área = estar dentro do polígono; a um corredor = estar a
+até o alcance da linha (o mais próximo vence).
 
 ## Rodar local
 

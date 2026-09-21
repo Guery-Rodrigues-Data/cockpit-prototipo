@@ -6,7 +6,7 @@
    ========================================================================== */
 
 :root {
-  --bg: #f4f5f7;
+  --bg: #e5e5e5;
   --surface: #ffffff;
   --surface-sunken: #fafbfc;
   --ink: #161a20;
@@ -39,7 +39,7 @@
   --font-body: "Inter", "Segoe UI", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", "Cascadia Code", ui-monospace, monospace;
 
-  --header-h: 94px;
+  --header-h: 64px; /* barra do topo; a barra de ferramentas e o canvas abaixo se posicionam a partir dela */
 }
 
 * { box-sizing: border-box; }
@@ -95,7 +95,7 @@ a { color: inherit; }
 .user-menu { position: relative; display: flex; }
 .user-menu-dropdown {
   display: none; position: absolute; top: calc(100% + 8px); right: 0; width: 274px;
-  max-height: calc(100vh - 140px); overflow-y: auto;
+  max-height: calc(100vh - var(--header-h) - 46px); overflow-y: auto;
   background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
   box-shadow: var(--shadow-md); padding: 6px; z-index: 950;
 }
@@ -127,7 +127,7 @@ a { color: inherit; }
 
 .cockpit-toolbar {
   position: fixed;
-  top: 131px;
+  top: calc(20px + var(--header-h) + 17px);
   left: 16px;
   right: 16px;
   height: 56px;
@@ -138,17 +138,9 @@ a { color: inherit; }
 }
 .cockpit-toolbar-title {
   font-family: var(--font-display);
-  font-size: 19px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: -0.01em;
-}
-.cockpit-toolbar-title span {
-  display: block;
-  font-family: var(--font-body);
-  font-weight: 400;
-  font-size: 12.5px;
-  color: var(--ink-faint);
-  margin-top: 1px;
 }
 
 .btn-primary {
@@ -219,7 +211,7 @@ a { color: inherit; }
 
 .cockpit-canvas {
   position: fixed;
-  top: 203px;
+  top: calc(20px + var(--header-h) + 89px); /* + barra de ferramentas (56px) e respiro (17px + 16px) */
   left: 16px;
   right: 16px;
   bottom: 16px;
@@ -638,16 +630,109 @@ a { color: inherit; }
   font-size: 11.5px !important;
   border-radius: 6px !important;
 }
+/* Hierarquia: dispositivo saudável é só um ponto discreto; com problema ganha o pin com ícone. */
+.map-dot {
+  width: 14px; height: 14px; border-radius: 50%; background: var(--green); border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgba(31, 157, 92, 0.35); opacity: 0.85; transition: transform 0.12s ease;
+}
+.map-dot:hover { opacity: 1; transform: scale(1.35); }
+.map-dot.is-selecionado { opacity: 1; transform: scale(1.7); box-shadow: 0 0 0 4px rgba(224, 52, 43, 0.35); }
 .map-eq-pin {
   width: 26px; height: 26px; border-radius: 50%; background: #fff; border: 2px solid var(--pin-cor, var(--ink));
   color: var(--pin-cor, var(--ink)); display: flex; align-items: center; justify-content: center;
-  box-shadow: var(--shadow-sm); position: relative;
+  box-shadow: 0 2px 8px rgba(22, 26, 32, 0.22); position: relative;
 }
 .map-eq-pin svg { width: 13px; height: 13px; }
-.map-eq-pin-alerta {
-  position: absolute; top: -2px; right: -2px; width: 9px; height: 9px; border-radius: 50%;
-  background: var(--red); border: 1.5px solid #fff;
+.map-eq-pin.is-selecionado { transform: scale(1.2); box-shadow: 0 0 0 4px rgba(224, 52, 43, 0.3), var(--shadow-md); }
+
+/* Cluster recuado por padrão; âmbar com alertas; vermelho quando agrupa algum offline. */
+.map-cluster {
+  width: 32px; height: 32px; border-radius: 50%; background: #fff; color: var(--ink-muted); border: 2px solid var(--border-strong);
+  display: flex; align-items: center; justify-content: center; position: relative;
+  font-family: var(--font-body); font-size: 11.5px; font-weight: 700; box-shadow: var(--shadow-sm);
 }
+.map-cluster.is-alerta { background: var(--amber-tint); color: #8a5a06; border-color: var(--amber); }
+.map-cluster.is-offline { background: var(--red); color: #fff; border-color: #fff; box-shadow: 0 2px 10px rgba(224, 52, 43, 0.4); }
+.map-cluster-prob {
+  position: absolute; top: -7px; right: -7px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px;
+  background: var(--amber); color: #fff; border: 1.5px solid #fff; font-size: 10px; line-height: 14px; text-align: center;
+}
+.map-cluster.is-offline .map-cluster-prob { background: #fff; color: var(--red); border-color: var(--red); }
+
+/* Só problemas: liga/desliga no topo do mapa, com a contagem viva de quantos existem. */
+.map-toggle {
+  display: flex; align-items: center; gap: 7px; border: 1px solid var(--border-strong); background: var(--surface);
+  border-radius: var(--radius-sm); padding: 6px 10px; font-size: 12px; font-weight: 600; color: var(--ink);
+  cursor: pointer; white-space: nowrap; box-shadow: var(--shadow-md);
+}
+.map-toggle:hover { background: var(--surface-sunken); }
+.map-toggle-trilho { position: relative; width: 24px; height: 14px; flex-shrink: 0; border-radius: 999px; background: var(--border-strong); transition: background 0.15s ease; }
+.map-toggle-bola { position: absolute; top: 2px; left: 2px; width: 10px; height: 10px; border-radius: 50%; background: #fff; transition: transform 0.15s ease; }
+.map-toggle-n { min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--red-tint); color: var(--red); font-size: 11px; line-height: 16px; text-align: center; }
+.map-toggle[aria-pressed="true"] { border-color: var(--red); background: var(--red-tint); color: var(--red); }
+.map-toggle[aria-pressed="true"] .map-toggle-trilho { background: var(--red); }
+.map-toggle[aria-pressed="true"] .map-toggle-bola { transform: translateX(10px); }
+.map-toggle[aria-pressed="true"] .map-toggle-n { background: var(--red); color: #fff; }
+
+/* ---------- painel lateral de seleção (clique num dispositivo/região do Mapa) ---------- */
+.map-selecao {
+  position: absolute; top: 58px; right: 10px; bottom: 28px; width: 340px; max-width: calc(100% - 20px); z-index: 900; /* bottom deixa a atribuição do mapa visível */
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-lg);
+  font-family: var(--font-body);
+}
+.map-selecao[hidden] { display: none; }
+.map-selecao.is-open { animation: selecaoEntra 0.22s ease-out; }
+@keyframes selecaoEntra { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+.sel-head { display: flex; align-items: center; gap: 10px; padding: 12px 10px 12px 14px; border-bottom: 1px solid var(--border); }
+.sel-icone {
+  width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  background: var(--red-tint); color: var(--red);
+}
+.sel-icone svg { width: 17px; height: 17px; }
+.sel-titulo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sel-titulo strong { font-size: 13.5px; line-height: 1.25; }
+.sel-titulo span { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-faint); }
+.sel-corpo { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+.sel-dados { padding: 2px 14px 6px; }
+.sel-bloco { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.sel-bloco:last-child { border-bottom: none; }
+.sel-bloco h5 {
+  margin: 0 0 8px; display: flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-faint);
+}
+.sel-contagem { padding: 1px 7px; border-radius: 999px; background: var(--surface-sunken); border: 1px solid var(--border); color: var(--ink-muted); letter-spacing: 0; }
+.sel-linha { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0; font-size: 12.5px; color: var(--ink-muted); }
+.sel-linha strong { color: var(--ink); font-weight: 600; text-align: right; }
+.sel-linha em { color: var(--ink-faint); font-style: normal; }
+.sel-mono { font-family: var(--font-mono); font-size: 11.5px !important; }
+.sel-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.sel-kpi { padding: 8px 4px; text-align: center; background: var(--surface-sunken); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.sel-kpi b { display: block; font-family: var(--font-display); font-size: 18px; line-height: 1.1; }
+.sel-kpi span { font-size: 10px; color: var(--ink-faint); }
+.sel-kpi.is-alerta b { color: var(--red); }
+.sel-cat { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 12.5px; }
+.sel-cat svg { width: 14px; height: 14px; color: var(--ink-muted); flex-shrink: 0; }
+.sel-cat > span:first-of-type { flex: 1; color: var(--ink-muted); }
+.sel-cat-off { font-size: 11px; font-weight: 600; color: var(--red); }
+.sel-sev { display: flex; flex-wrap: wrap; gap: 6px; }
+.sel-alerta { padding: 8px 10px; margin-bottom: 6px; background: var(--surface-sunken); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.sel-alerta > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sel-alerta p { margin: 6px 0 0; font-size: 12px; line-height: 1.4; }
+.sel-vazio { font-size: 12px; color: var(--ink-faint); }
+.sel-item {
+  display: flex; width: calc(100% + 16px); margin: 0 -8px; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 7px 8px; border: none; border-radius: var(--radius-sm); background: none; text-align: left; font: inherit; font-size: 12.5px; cursor: pointer;
+}
+.sel-item:hover { background: var(--surface-sunken); }
+.sel-item > span:first-child { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.sel-item strong { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sel-acoes {
+  position: sticky; bottom: 0; margin-top: auto; padding: 12px 14px; display: flex; flex-wrap: wrap; gap: 8px;
+  background: var(--surface); border-top: 1px solid var(--border);
+}
+.sel-acoes .btn-secondary, .sel-acoes .btn-primary { flex: 1 1 calc(50% - 4px); padding: 8px 10px; font-size: 12px; }
+
 .map-popup { font-family: var(--font-body); min-width: 150px; }
 .map-popup strong { display: block; font-size: 12.5px; margin-bottom: 2px; }
 .map-popup span { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-faint); }
@@ -777,3 +862,86 @@ a { color: inherit; }
 
 /* container queries pro número do card reagir ao tamanho real do widget */
 .totais-body { container-type: inline-size; }
+
+/* Widget de Regiões: busca em cima, abas Subáreas/Corredores embaixo, cada uma na largura toda
+   (lado a lado a busca era cortada em widgets estreitos). */
+.lista-toolbar.is-empilhada { flex-direction: column; align-items: stretch; gap: 8px; }
+.lista-toolbar.is-empilhada .lista-search { flex: none; }
+.lista-toolbar.is-empilhada .lista-tabs .lista-tab { flex: 1; }
+
+/* linha da lista cuja região/dispositivo está aberto no painel lateral do Mapa */
+.lista-tabela tr.is-selecionada td { background: var(--red-tint); }
+.lista-tabela tr.is-selecionada td:first-child { box-shadow: inset 3px 0 0 var(--red); }
+
+/* Título da tela como caminho: [casa vermelha] » Cockpit */
+.cockpit-breadcrumb { display: flex; align-items: center; gap: 6px; }
+.cockpit-breadcrumb-home { display: inline-flex; color: var(--red); }
+.cockpit-breadcrumb-home:hover { color: var(--red-dark); }
+.cockpit-breadcrumb-home svg { width: 16px; height: 16px; }
+.cockpit-breadcrumb-sep { width: 14px; height: 14px; color: var(--ink-faint); flex-shrink: 0; }
+.cockpit-breadcrumb-atual { line-height: 1.2; }
+
+/* Lista de Regiões: recuo lateral da lista (--recuo-lista), para as linhas e o destaque da seleção
+   não ficarem colados nas bordas do widget. */
+.lista-scroll.is-recuada { --recuo-lista: 20px; padding: 0 var(--recuo-lista) 10px; }
+.lista-scroll.is-recuada .lista-tabela { margin-top: 8px; border-collapse: separate; border-spacing: 0; }
+.lista-scroll.is-recuada .lista-tabela thead th { padding: 7px 10px; border-radius: var(--radius-sm); }
+.lista-scroll.is-recuada .lista-tabela tbody td { padding: 9px 10px; }
+.lista-scroll.is-recuada .lista-tabela tbody tr:first-child td { border-top: none; }
+.lista-scroll.is-recuada .lista-tabela tbody tr:hover td { background: var(--surface-sunken); }
+.lista-scroll.is-recuada .lista-tabela tbody tr td { border-radius: var(--radius-sm); }
+.lista-scroll.is-recuada .lista-tabela tbody tr.is-selecionada td { background: var(--red-tint); }
+
+/* ---------- abas do painel lateral (controlador): Geral, Status, Comandos, Grupos ---------- */
+.sel-selo { flex-shrink: 0; }
+.sel-abas { display: flex; padding: 0 6px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.sel-aba {
+  flex: 1; padding: 10px 4px; border: none; border-bottom: 2px solid transparent; background: none;
+  font: inherit; font-size: 12px; font-weight: 600; color: var(--ink-faint); cursor: pointer;
+}
+.sel-aba:hover { color: var(--ink); }
+.sel-aba.is-ativa { color: var(--red); border-bottom-color: var(--red); }
+.sel-nota { margin: 8px 0 0; font-size: 11.5px; line-height: 1.4; color: var(--ink-faint); }
+.sel-aviso { margin-bottom: 8px; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--amber-tint); color: #8a5a06; font-size: 12px; line-height: 1.4; }
+.status-tag[data-status="pendente"] { color: var(--ink-muted); background: var(--surface-sunken); border: 1px solid var(--border); }
+
+/* Comandos em cartões lado a lado (ícone + nome), como no painel de comandos do sistema atual */
+.sel-cmds { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.sel-cmd-grupo { margin: 14px 0 8px; }
+.sel-cmd-grupo:first-of-type { margin-top: 0; }
+.sel-cmd {
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 8px; min-width: 0; min-height: 92px;
+  padding: 12px 6px 10px; text-align: center;
+  border: none; border-radius: var(--radius-md); background: none;
+  font: inherit; color: var(--ink); cursor: pointer; transition: background 0.12s ease;
+}
+.sel-cmd:hover { background: var(--surface-sunken); }
+.sel-cmd-icone {
+  width: 28px; height: 28px; flex-shrink: 0; border-radius: 6px; background: #6b6b6b; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+}
+.sel-cmd-icone svg { width: 16px; height: 16px; }
+.sel-cmd.is-perigo .sel-cmd-icone { background: var(--red); }
+.sel-cmd-nome { font-size: 11px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+.sel-cmd.is-armado { background: var(--red-tint); }
+.sel-cmd.is-armado .sel-cmd-icone { background: var(--red-dark); }
+.sel-cmd.is-armado .sel-cmd-nome { color: var(--red); }
+.sel-hist { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 12px; }
+.sel-hist strong { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.sel-link { display: block; margin-top: 8px; padding: 8px 10px; font-size: 12px; text-align: center; text-decoration: none; }
+.sel-grupo { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--border); }
+.sel-grupo-id {
+  min-width: 34px; padding: 3px 6px; border-radius: var(--radius-sm); background: var(--surface-sunken); border: 1px solid var(--border);
+  font-family: var(--font-mono); font-size: 11px; text-align: center;
+}
+.sel-grupo-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.sel-grupo-txt strong { font-size: 12.5px; font-weight: 600; }
+.sel-grupo-txt span { font-size: 11.5px; color: var(--ink-faint); }
+
+.sel-selo:empty { display: none; }
+
+.sel-aba-n {
+  display: inline-block; margin-left: 4px; min-width: 16px; padding: 0 5px; border-radius: 999px; background: var(--red); color: #fff;
+  font-size: 10.5px; font-weight: 700; line-height: 16px; text-align: center; vertical-align: 1px;
+}
