@@ -61,24 +61,27 @@ a { color: inherit; }
 
 /* ---------- Topbar (idêntico ao croqui-prototipo) ---------- */
 
-.app-topbar {
+.app-topbar-wrap {
   position: fixed;
-  top: 20px;
+  top: 16px;
   left: 16px;
   right: 16px;
+  padding: 0 16px;
+  background: #fafafa;
+  border-radius: 8px;
+  z-index: 900;
+}
+.app-topbar {
   height: var(--header-h);
   background: var(--surface);
-  border: 1px solid var(--border);
   border-radius: 8px;
-  box-shadow: var(--shadow-sm);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 16px;
-  z-index: 900;
 }
-.app-topbar-logo { display: flex; align-items: center; height: 36px; margin-left: 10px; }
-.app-topbar-logo svg { height: 36px; width: auto; display: block; }
+.app-topbar-logo { display: flex; align-items: center; height: 32px; }
+.app-topbar-logo svg { height: 32px; width: 104px; display: block; }
 .app-topbar-actions { display: flex; align-items: center; gap: 4px; }
 .topbar-icon-btn {
   width: 40px; height: 40px; border-radius: 50%; border: none; background: transparent;
@@ -127,21 +130,22 @@ a { color: inherit; }
 
 .cockpit-toolbar {
   position: fixed;
-  top: calc(20px + var(--header-h) + 17px);
+  top: calc(16px + var(--header-h) + 8px);
   left: 16px;
   right: 16px;
-  height: 56px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   z-index: 850;
 }
 .cockpit-toolbar-title {
-  font-family: var(--font-display);
+  font-family: "Roboto", var(--font-body);
   font-size: 14px;
   font-weight: 600;
   letter-spacing: -0.01em;
 }
+.cockpit-toolbar .btn-primary { padding: 8px 14px; font-size: 13px; }
 
 .btn-primary {
   background: var(--red); color: #fff; border: none; border-radius: var(--radius-md);
@@ -211,10 +215,10 @@ a { color: inherit; }
 
 .cockpit-canvas {
   position: fixed;
-  top: calc(20px + var(--header-h) + 89px); /* + barra de ferramentas (56px) e respiro (17px + 16px) */
-  left: 16px;
-  right: 16px;
-  bottom: 16px;
+  top: calc(16px + var(--header-h) + 52px); /* + barra de ferramentas (44px) e respiro (8px + 0px) */
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -294,7 +298,7 @@ a { color: inherit; }
   flex-direction: column;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: 10px;
   box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
@@ -302,7 +306,7 @@ a { color: inherit; }
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   padding: 10px 8px 10px 10px;
   border-bottom: 1px solid var(--border);
   cursor: grab;
@@ -684,17 +688,23 @@ a { color: inherit; }
 .map-selecao[hidden] { display: none; }
 .map-selecao.is-open { animation: selecaoEntra 0.22s ease-out; }
 @keyframes selecaoEntra { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
-.sel-head { display: flex; align-items: center; gap: 10px; padding: 12px 10px 12px 14px; border-bottom: 1px solid var(--border); }
-.sel-icone {
-  width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-  background: var(--red-tint); color: var(--red);
-}
-.sel-icone svg { width: 17px; height: 17px; }
+.sel-head { display: flex; align-items: center; gap: 10px; padding: 14px 10px 14px 16px; background: var(--ink); color: #fff; }
 .sel-titulo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.sel-titulo strong { font-size: 13.5px; line-height: 1.25; }
-.sel-titulo span { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-faint); }
+.sel-titulo strong { font-size: 16px; line-height: 1.25; color: #fff; }
+.sel-titulo span { font-family: var(--font-mono); font-size: 11px; color: rgba(255, 255, 255, 0.72); }
+/* cabeçalho escuro (vermelho parecia erro): o X segue branco, com hover em branco translúcido */
+.sel-head .widget-icon-btn { color: rgba(255, 255, 255, 0.85); }
+.sel-head .widget-icon-btn:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
+.sel-head .widget-icon-btn:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
 .sel-corpo { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
-.sel-dados { padding: 2px 14px 6px; }
+.sel-footer {
+  flex-shrink: 0; padding: 8px 14px; border-top: 1px solid var(--border); background: var(--surface-sunken);
+  font-size: 11px; color: var(--ink-faint); display: flex; flex-direction: column; gap: 4px;
+}
+.sel-footer strong, .sel-footer em { color: var(--ink-muted); font-weight: 600; font-style: normal; }
+.sel-footer-linha { display: flex; align-items: center; justify-content: space-between; gap: 5px; }
+.sel-footer-linha strong { font-family: var(--font-mono); font-weight: 500; }
+.sel-dados { padding: 14px 14px 6px; }
 .sel-bloco { padding: 10px 0; border-bottom: 1px solid var(--border); }
 .sel-bloco:last-child { border-bottom: none; }
 .sel-bloco h5 {
@@ -706,9 +716,23 @@ a { color: inherit; }
 .sel-linha strong { color: var(--ink); font-weight: 600; text-align: right; }
 .sel-linha em { color: var(--ink-faint); font-style: normal; }
 .sel-mono { font-family: var(--font-mono); font-size: 11.5px !important; }
+
+/* Campos em grade (rótulo em cima, valor embaixo): mais denso e mais fácil de escanear que
+   linha-a-linha quando são vários campos curtos juntos (Identificação, Modo de operação). */
+.sel-campos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 28px; padding: 2px 0; }
+.sel-campo { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.sel-campo.is-full { grid-column: 1 / -1; }
+.sel-campo > span:first-child { font-size: 10.5px; color: var(--ink-faint); }
+.sel-campo strong, .sel-campo em { font-size: 12.5px; color: var(--ink); font-weight: 600; }
+.sel-campo em { color: var(--ink-faint); font-style: normal; font-weight: 400; }
+.sel-campo .status-tag { align-self: flex-start; }
+
 .sel-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.sel-kpis.is-duo { grid-template-columns: repeat(2, 1fr); }
 .sel-kpi { padding: 8px 4px; text-align: center; background: var(--surface-sunken); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.sel-kpis.is-duo .sel-kpi { padding: 10px 6px; }
 .sel-kpi b { display: block; font-family: var(--font-display); font-size: 18px; line-height: 1.1; }
+.sel-kpis.is-duo .sel-kpi b { font-size: 15px; line-height: 1.2; }
 .sel-kpi span { font-size: 10px; color: var(--ink-faint); }
 .sel-kpi.is-alerta b { color: var(--red); }
 .sel-cat { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 12.5px; }
@@ -716,9 +740,31 @@ a { color: inherit; }
 .sel-cat > span:first-of-type { flex: 1; color: var(--ink-muted); }
 .sel-cat-off { font-size: 11px; font-weight: 600; color: var(--red); }
 .sel-sev { display: flex; flex-wrap: wrap; gap: 6px; }
-.sel-alerta { padding: 8px 10px; margin-bottom: 6px; background: var(--surface-sunken); border: 1px solid var(--border); border-radius: var(--radius-sm); }
-.sel-alerta > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.sel-alerta p { margin: 6px 0 0; font-size: 12px; line-height: 1.4; }
+.sel-timeline-item { display: flex; gap: 10px; padding-bottom: 16px; position: relative; }
+.sel-timeline-item:last-child { padding-bottom: 0; }
+.sel-timeline-item:not(:last-child)::before {
+  content: ""; position: absolute; left: 3px; top: 13px; bottom: 0; width: 1px; background: var(--border);
+}
+.sel-timeline-dot {
+  position: relative; width: 7px; height: 7px; margin-top: 6px; border-radius: 50%; flex-shrink: 0;
+  background: var(--border-strong); color: var(--border-strong); z-index: 1;
+}
+.sel-timeline-item[data-sev="Crítico"] .sel-timeline-dot { background: var(--red); color: var(--red); }
+.sel-timeline-item[data-sev="Alto"] .sel-timeline-dot { background: var(--amber); color: var(--amber); }
+.sel-timeline-item[data-sev="Médio"] .sel-timeline-dot { background: #1b52c0; color: #1b52c0; }
+/* pulso: sinaliza que é alerta ATIVO agora, não um item de histórico parado */
+.sel-timeline-dot::after {
+  content: ""; position: absolute; inset: -4px; border-radius: 50%; background: currentColor; opacity: 0;
+  animation: selAlertaPulso 2s ease-out infinite;
+}
+@keyframes selAlertaPulso {
+  0% { opacity: 0.45; transform: scale(0.4); }
+  70%, 100% { opacity: 0; transform: scale(1.8); }
+}
+.sel-timeline-content { flex: 1; min-width: 0; }
+.sel-timeline-content p { margin: 0; font-size: 13px; font-weight: 600; line-height: 1.4; color: var(--ink); }
+.sel-timeline-meta { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 11px; color: var(--ink-faint); }
+.sel-timeline-meta .id-mono { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-faint); }
 .sel-vazio { font-size: 12px; color: var(--ink-faint); }
 .sel-item {
   display: flex; width: calc(100% + 16px); margin: 0 -8px; align-items: center; justify-content: space-between; gap: 8px;
@@ -874,12 +920,12 @@ a { color: inherit; }
 .lista-tabela tr.is-selecionada td:first-child { box-shadow: inset 3px 0 0 var(--red); }
 
 /* Título da tela como caminho: [casa vermelha] » Cockpit */
-.cockpit-breadcrumb { display: flex; align-items: center; gap: 6px; }
+.cockpit-breadcrumb { display: flex; align-items: center; gap: 6px; font-family: "Roboto", var(--font-body); }
 .cockpit-breadcrumb-home { display: inline-flex; color: var(--red); }
 .cockpit-breadcrumb-home:hover { color: var(--red-dark); }
-.cockpit-breadcrumb-home svg { width: 16px; height: 16px; }
+.cockpit-breadcrumb-home svg { width: 18px; height: 18px; }
 .cockpit-breadcrumb-sep { width: 14px; height: 14px; color: var(--ink-faint); flex-shrink: 0; }
-.cockpit-breadcrumb-atual { line-height: 1.2; }
+.cockpit-breadcrumb-atual { line-height: 1.2; font-weight: 700; }
 
 /* Lista de Regiões: recuo lateral da lista (--recuo-lista), para as linhas e o destaque da seleção
    não ficarem colados nas bordas do widget. */
@@ -906,23 +952,39 @@ a { color: inherit; }
 .status-tag[data-status="pendente"] { color: var(--ink-muted); background: var(--surface-sunken); border: 1px solid var(--border); }
 
 /* Comandos em cartões lado a lado (ícone + nome), como no painel de comandos do sistema atual */
-.sel-cmds { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.sel-cmds { display: flex; flex-direction: column; }
 .sel-cmd-grupo { margin: 14px 0 8px; }
 .sel-cmd-grupo:first-of-type { margin-top: 0; }
 .sel-cmd {
-  display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 8px; min-width: 0; min-height: 92px;
-  padding: 12px 6px 10px; text-align: center;
-  border: none; border-radius: var(--radius-md); background: none;
+  display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; padding: 9px 8px; text-align: left;
+  border: none; border-radius: var(--radius-sm); background: none;
   font: inherit; color: var(--ink); cursor: pointer; transition: background 0.12s ease;
 }
+.sel-cmd-linha { display: flex; align-items: center; }
+.sel-cmds > .sel-cmd-linha:not(:first-child) { border-top: 1px solid var(--border); }
+.sel-cmd-seta {
+  display: inline-flex; flex-shrink: 0; margin-right: 2px; padding: 8px; border: none; border-radius: var(--radius-sm);
+  background: none; color: var(--ink-faint); cursor: pointer;
+}
+.sel-cmd-seta:hover { color: var(--ink); background: var(--surface-sunken); }
+.sel-cmd-seta svg { width: 16px; height: 16px; transition: transform 0.15s ease; }
+.sel-cmd-seta[aria-expanded="true"] svg { transform: rotate(180deg); }
+/* resultado colado embaixo da linha do comando: sem linha entre os dois, a linha vem na próxima */
+.sel-cmds > .sel-resultado { padding: 4px 8px 16px; }
 .sel-cmd:hover { background: var(--surface-sunken); }
+.sel-cmd-play { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 14px; height: 14px; color: var(--border-strong); transition: color 0.12s ease; }
+.sel-cmd-play svg { width: 14px; height: 14px; }
+.sel-cmd:hover .sel-cmd-play { color: var(--red); }
+.sel-cmd.is-perigo .sel-cmd-play { color: var(--red-dark); }
 .sel-cmd-icone {
   width: 28px; height: 28px; flex-shrink: 0; border-radius: 6px; background: #6b6b6b; color: #fff;
   display: flex; align-items: center; justify-content: center;
 }
 .sel-cmd-icone svg { width: 16px; height: 16px; }
 .sel-cmd.is-perigo .sel-cmd-icone { background: var(--red); }
-.sel-cmd-nome { font-size: 11px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+/* respondido vence o vermelho do comando perigoso: verde = já voltou a resposta */
+.sel-cmd.is-respondido .sel-cmd-icone { background: var(--green); }
+.sel-cmd-nome { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 600; line-height: 1.3; }
 .sel-cmd.is-armado { background: var(--red-tint); }
 .sel-cmd.is-armado .sel-cmd-icone { background: var(--red-dark); }
 .sel-cmd.is-armado .sel-cmd-nome { color: var(--red); }
@@ -944,4 +1006,156 @@ a { color: inherit; }
 .sel-aba-n {
   display: inline-block; margin-left: 4px; min-width: 16px; padding: 0 5px; border-radius: 999px; background: var(--red); color: #fff;
   font-size: 10.5px; font-weight: 700; line-height: 16px; text-align: center; vertical-align: 1px;
+}
+
+/* ---------- resultado dos comandos, embaixo da lista (mesmo conteúdo dos modais do sistema atual) ---------- */
+.cmd-cruz { font-size: 13.5px; font-weight: 500; color: #333; }
+.cmd-rotulo { color: var(--red); font-weight: 700; }
+.cmd-ctrl { margin: 8px 0 16px; font-size: 13.5px; font-weight: 700; color: var(--ink-muted); }
+.cmd-campos { display: grid; grid-template-columns: auto 1fr; gap: 6px 28px; margin-bottom: 14px; font-size: 12.5px; }
+.cmd-campos b { font-weight: 700; color: #333; }
+.cmd-campos span { color: var(--ink-muted); }
+.cmd-placas-titulo { margin-bottom: 12px; font-size: 14px; font-weight: 700; color: var(--ink-muted); }
+.cmd-placas { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; font-size: 12.5px; }
+.cmd-placa { display: grid; grid-template-columns: 44px 130px 1fr; gap: 8px; }
+.cmd-placa b { font-weight: 700; color: #333; }
+.cmd-placa span { color: var(--ink-muted); }
+.cmd-placa span b { margin-right: 4px; }
+.cmd-tabela { margin: 6px 0 8px; border: 1px solid var(--border-strong); border-radius: 10px; overflow: hidden; background: #fff; }
+.cmd-tabela table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.cmd-tabela th { padding: 13px 16px; text-align: left; background: #6b6b6b; color: #fff; font-weight: 700; }
+.cmd-tabela td { padding: 15px 16px; color: #333; }
+.cmd-tabela tbody tr + tr td { border-top: 1px solid var(--border); }
+.cmd-topo-alarmes { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.cmd-baixar {
+  display: inline-flex; padding: 8px; border: 1px solid var(--border-strong); border-radius: 8px; background: #fff; color: var(--ink); cursor: pointer;
+}
+.cmd-baixar:hover { background: #f4f4f4; }
+.cmd-baixar svg { width: 18px; height: 18px; }
+.cmd-sucesso { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 26px 0 8px; text-align: center; color: var(--ink-faint); font-size: 13px; line-height: 1.5; }
+.cmd-sucesso svg { width: 22px; height: 22px; color: var(--green); }
+.cmd-sucesso p { margin: 0; }
+
+/* o conteúdo foi desenhado para um modal largo; dentro do painel (340px) ele se empilha */
+.sel-resultado-topo { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.sel-resultado-topo strong { font-size: 12px; line-height: 1.35; color: var(--ink); }
+.sel-resultado-x { display: inline-flex; flex-shrink: 0; padding: 2px; border: none; background: none; color: var(--ink-muted); cursor: pointer; }
+.sel-resultado-x:hover { color: var(--ink); }
+.sel-resultado-x svg { width: 16px; height: 16px; }
+.sel-resultado .cmd-cruz, .sel-resultado .cmd-ctrl { font-size: 11.5px; }
+.sel-resultado .cmd-campos, .sel-resultado .cmd-placas, .sel-resultado .sel-vazio { font-size: 11.5px; }
+.sel-resultado .cmd-ctrl { margin: 4px 0 12px; }
+.sel-resultado .cmd-campos { grid-template-columns: 1fr; gap: 2px; margin-bottom: 12px; }
+.sel-resultado .cmd-campos b { margin-top: 6px; }
+.sel-resultado .cmd-placas-titulo { margin-bottom: 8px; font-size: 11.5px; }
+.sel-resultado .cmd-placa { grid-template-columns: 38px 1fr 1fr; gap: 6px; }
+.sel-resultado .cmd-tabela table { font-size: 11px; }
+.sel-resultado .cmd-tabela th, .sel-resultado .cmd-tabela td { padding: 8px 10px; }
+.sel-resultado .cmd-sucesso { margin: 16px 0 4px; font-size: 11.5px; }
+
+/* seções recolhíveis da aba Geral (como "Detalhes do dispositivo" no sistema atual) */
+.sel-secao { border-bottom: 1px solid var(--border); }
+.sel-secao:last-of-type { border-bottom: none; }
+.sel-secao:has(+ .sel-croqui-atalho) { border-bottom: none; }
+.sel-croqui-atalho { padding-top: 12px; text-align: right; }
+.sel-croqui-atalho .btn-text { display: inline-block; width: auto; text-align: right; }
+.sel-secao-topo {
+  display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 14px 0; border: none; background: none;
+  font: inherit; font-size: 14.5px; font-weight: 700; color: var(--ink); text-align: left; cursor: pointer;
+}
+.sel-secao-topo svg { width: 16px; height: 16px; flex-shrink: 0; color: var(--ink-muted); transition: transform 0.15s ease; }
+.sel-secao-topo[aria-expanded="true"] svg { transform: rotate(180deg); }
+.sel-secao-corpo { padding: 0 0 14px; }
+
+/* ---------- aba Plano do painel do controlador: segue a aba Geral (campos + seções recolhíveis) ---------- */
+:root {
+  --plano-verde: #1f9d5c;
+  --plano-amarelo: #e6a817;
+  --plano-vermelho: #d23a31;
+  --plano-interm: #7a1a14; /* vermelho intermitente (pedestre), listrado com o vermelho */
+}
+.status-tag[data-status="previsto"] { color: #8a5a06; background: var(--amber-tint); }
+.plano-nome { display: inline-flex; align-items: center; gap: 6px; }
+
+.plano-diag { display: block; width: 100%; height: auto; }
+.plano-diag-est { font-family: var(--font-body); font-size: 10px; fill: var(--ink-faint); }
+.plano-diag-grupo { font-family: var(--font-body); font-size: 10.5px; font-weight: 600; fill: var(--ink); }
+.plano-diag-troca { stroke: var(--ink); stroke-opacity: 0.35; stroke-dasharray: 2 2; }
+.plano-diag-eixo { stroke: var(--border-strong); }
+.plano-diag-eixo-txt { font-family: var(--font-body); font-size: 10px; fill: var(--ink-faint); }
+.plano-diag-cursor { stroke: var(--ink); stroke-width: 2; }
+.plano-legenda { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; font-size: 10.5px; color: var(--ink-faint); }
+.plano-legenda i { display: inline-block; width: 10px; height: 8px; margin-right: 4px; border-radius: 1px; }
+.plano-legenda i.is-interm { background: repeating-linear-gradient(135deg, var(--plano-interm) 0 2px, var(--plano-vermelho) 2px 4px); }
+
+.plano-agenda { position: relative; margin-top: 12px; }
+.plano-barra { position: relative; display: flex; height: 26px; border-radius: var(--radius-sm); overflow: hidden; }
+.plano-bloco {
+  flex-shrink: 0; min-width: 0; padding: 0; border: none; border-right: 2px solid var(--surface);
+  background: #e4e7ec; color: var(--ink-muted);
+  font: inherit; font-size: 10.5px; font-weight: 600; cursor: pointer; overflow: hidden; white-space: nowrap;
+  transition: background 0.1s ease;
+}
+.plano-bloco:last-of-type { border-right: none; }
+.plano-bloco:hover, .plano-bloco.is-hover { background: #c9ced6; color: var(--ink); }
+.plano-bloco.is-sel { background: var(--blue); color: #fff; }
+.plano-bloco:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+.plano-agora { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--red); pointer-events: none; }
+.plano-horas { position: relative; height: 14px; margin-top: 4px; font-size: 10px; color: var(--ink-faint); }
+.plano-horas span { position: absolute; transform: translateX(-50%); }
+.plano-horas span:first-child { transform: none; }
+.plano-horas span:last-child { transform: translateX(-100%); }
+
+/* modal "Planos do controlador" (aberto pelo "Ver todos os planos" da aba Plano) — reaproveita o
+   .config-modal do app, mais largo e sem Salvar. Uma coluna só: chips (qual) → semana (quando) → detalhe (como). */
+.plano-modal { width: 900px; max-height: 90vh; }
+.plano-modal-titulo { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.plano-modal-titulo span { font-family: var(--font-mono); font-size: 10px; color: var(--ink-faint); }
+.plano-modal-corpo { gap: 22px; padding: 18px 22px 20px; }
+.plano-modal-h {
+  margin: 0 0 10px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-faint);
+}
+
+.plano-chips-linha { display: flex; align-items: center; gap: 14px; }
+.plano-chips-linha .plano-modal-h { margin: 0; }
+.plano-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.plano-chip {
+  position: relative; min-width: 34px; height: 30px; padding: 0 8px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface); font: inherit; font-size: 12.5px; font-weight: 600; color: var(--ink-muted); cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.plano-chip:hover, .plano-chip.is-hover { border-color: var(--border-strong); background: var(--surface-sunken); color: var(--ink); }
+.plano-chip.is-sel { border-color: var(--blue); background: var(--blue); color: #fff; }
+.plano-chip.is-fora { border-style: dashed; }
+.plano-chip:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.plano-chip-agora { position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+
+.plano-semana { display: flex; flex-direction: column; gap: 4px; }
+.plano-semana-linha { display: grid; grid-template-columns: 52px 1fr; align-items: center; gap: 10px; }
+.plano-semana-dia { display: flex; align-items: baseline; gap: 5px; font-size: 12px; font-weight: 600; color: var(--ink-muted); }
+.plano-semana-dia small { font-size: 9.5px; font-weight: 700; color: var(--red); text-transform: uppercase; letter-spacing: 0.04em; }
+.plano-semana-linha.is-hoje .plano-semana-dia { color: var(--ink); }
+.plano-semana .plano-barra { height: 22px; border-radius: 4px; }
+.plano-semana .plano-bloco { font-size: 10.5px; }
+.plano-semana-linha.is-eixo .plano-horas { margin-top: 0; }
+
+.plano-detalhe { display: flex; flex-direction: column; gap: 14px; padding-top: 18px; border-top: 1px solid var(--border); }
+.plano-detalhe-topo { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.plano-detalhe-nome { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.plano-detalhe-nome .plano-nome { font-size: 15px; font-weight: 700; color: var(--ink); }
+.plano-detalhe-nome span { font-size: 12px; color: var(--ink-muted); white-space: pre-wrap; }
+.plano-config { display: grid; grid-template-columns: 1fr 220px; gap: 28px; align-items: start; }
+.plano-config-campos { grid-template-columns: repeat(3, 1fr); gap: 12px 24px; }
+.plano-estagios { width: 100%; border-collapse: collapse; font-size: 12.5px; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.plano-estagios th { padding: 6px 12px; text-align: left; font-size: 10.5px; font-weight: 600; color: var(--ink-faint); background: var(--surface-sunken); border-bottom: 1px solid var(--border); }
+.plano-estagios td { padding: 6px 12px; color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.plano-estagios td + td, .plano-estagios th + th { text-align: right; }
+.plano-estagios tbody tr + tr td { border-top: 1px solid var(--border); }
+
+.plano-modal-acoes { align-items: center; justify-content: space-between; }
+.plano-modal-acoes .btn-secondary { flex: 0 0 auto; padding-inline: 20px; }
+.plano-modal-rodape { font-size: 11px; color: var(--ink-faint); }
+@media (max-width: 760px) {
+  .plano-config { grid-template-columns: 1fr; }
+  .plano-config-campos { grid-template-columns: 1fr 1fr; }
 }

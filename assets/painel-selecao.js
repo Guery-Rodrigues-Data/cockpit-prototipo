@@ -132,22 +132,20 @@ const PainelSelecao = (() => {
       // Controlador (semáforo) ganha abas; os demais equipamentos seguem com a visão única.
       const ehControlador = eq.tipo === "semaforo";
       return {
-        icone: ICONES_CATEGORIA[eq.tipo] || ICONS.mapPin,
-        titulo: eq.nome,
-        sub: `${eq.id} · ${categoriaLabel(eq.tipo)}`,
-        selo: PainelControlador.statusTag(eq), // fica visível em todas as abas
+        titulo: eq.id,
+        sub: eq.nome,
         abas: ehControlador ? PainelControlador.abas(eq) : null,
         dados: (aba) => {
           const atual = LiveState.equipamentoPorId(sel.id);
           return ehControlador ? PainelControlador.dados(atual, aba) : dadosEquipamentoMarkup(atual);
         },
-        botoes: `<button type="button" class="btn-secondary" data-sel-acao="centralizar">Centralizar no mapa</button>`,
+        botoes: "",
+        rodape: () => PainelControlador.rodapeMarkup(LiveState.equipamentoPorId(sel.id)),
       };
     }
     const reg = regiaoPor(sel.tipo, sel.id);
     if (!reg) return null;
     return {
-      icone: ICONS.layers,
       titulo: reg.nome,
       sub: `${reg.id} · ${sel.tipo === "subarea" ? "Subárea" : "Corredor"}`,
       dados: () => dadosRegiaoMarkup(sel.tipo, regiaoPor(sel.tipo, sel.id)),
@@ -179,9 +177,7 @@ const PainelSelecao = (() => {
     const acoes = desc.botoes + (acoesExtras ? acoesExtras(sel) : "");
     el.innerHTML = `
       <header class="sel-head">
-        <span class="sel-icone">${desc.icone}</span>
         <div class="sel-titulo"><strong>${desc.titulo}</strong><span>${desc.sub}</span></div>
-        <span class="sel-selo">${desc.selo || ""}</span>
         <button type="button" class="widget-icon-btn" data-sel-acao="fechar" title="Fechar (Esc)">${ICONS.x}</button>
       </header>
       ${
@@ -197,7 +193,8 @@ const PainelSelecao = (() => {
       <div class="sel-corpo">
         <div class="sel-dados">${desc.dados(abaAtiva)}</div>
         ${acoes ? `<div class="sel-acoes">${acoes}</div>` : ""}
-      </div>`;
+      </div>
+      ${desc.rodape ? `<footer class="sel-footer">${desc.rodape()}</footer>` : ""}`;
     el.hidden = false;
     if (estavaFechado) {
       el.classList.remove("is-open");
@@ -222,8 +219,8 @@ const PainelSelecao = (() => {
     const dadosEl = el && el.querySelector(".sel-dados");
     const desc = sel && descricaoDaSelecao(sel);
     if (!dadosEl || !desc) return;
-    const selo = el.querySelector(".sel-selo");
-    if (selo) selo.innerHTML = desc.selo || "";
+    const rodape = el.querySelector(".sel-footer");
+    if (rodape && desc.rodape) rodape.innerHTML = desc.rodape();
     // a contagem de alertas no rótulo da aba acompanha o tempo real
     if (desc.abas) {
       desc.abas.forEach((a) => {
@@ -234,6 +231,8 @@ const PainelSelecao = (() => {
     // Comandos e Grupos não mudam sozinhos com o tempo real; refazê-los a cada tick desarmaria
     // o botão "Confirmar?" do Reset. Quem os altera pede o redesenho (redesenharDados).
     if (!forcar && (abaAtiva === "comandos" || abaAtiva === "grupos")) return;
+    // Refazer o HTML fecharia um select aberto; espera ele sair de foco.
+    if (!forcar && document.activeElement?.tagName === "SELECT" && dadosEl.contains(document.activeElement)) return;
     dadosEl.innerHTML = desc.dados(abaAtiva);
   }
 
@@ -257,9 +256,6 @@ const PainelSelecao = (() => {
           abaAtiva = alvo.dataset.aba;
           renderizar(sel);
         }
-        break;
-      case "centralizar":
-        if (sel && sel.tipo === "equipamento") CockpitMap.selecionarEquipamento(sel.id, { centralizar: true });
         break;
       case "abrir":
         CockpitMap.selecionarEquipamento(alvo.dataset.alvo, { centralizar: true });

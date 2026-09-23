@@ -6,7 +6,7 @@
 <title>Antares · Cockpit</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
 <link rel="stylesheet" href="https://unpkg.com/gridstack@9.5.1/dist/gridstack.min.css" />
@@ -29,6 +29,7 @@
 </head>
 <body>
 
+<div class="app-topbar-wrap">
 <header class="app-topbar">
   <a class="app-topbar-logo" href="index.html" title="Início">
     <svg viewBox="0 0 118 36" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -90,6 +91,7 @@
     </div>
   </div>
 </header>
+</div>
 
 <div class="cockpit-toolbar">
   <div class="cockpit-toolbar-title">
@@ -97,7 +99,7 @@
       <a class="cockpit-breadcrumb-home" href="index.html" title="Início" aria-label="Início">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/></svg>
       </a>
-      <svg class="cockpit-breadcrumb-sep" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 7 5 5-5 5"/><path d="m13 7 5 5-5 5"/></svg>
+      <svg class="cockpit-breadcrumb-sep" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 7 5 5-5 5"/><path d="m13 7 5 5-5 5"/></svg>
       <div class="cockpit-breadcrumb-atual">Cockpit</div>
     </div>
   </div>
@@ -186,6 +188,7 @@
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="https://unpkg.com/gridstack@9.5.1/dist/gridstack-all.js"></script>
 <script src="assets/data.js"></script>
+<script src="assets/alarmes.js"></script>
 <script src="assets/state.js"></script>
 <script src="assets/controladores.js"></script>
 <script src="assets/regioes.js"></script>

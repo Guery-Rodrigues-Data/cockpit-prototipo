@@ -26,6 +26,7 @@ const ICONS = {
   externalLink: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3"/></svg>',
   dashboard: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>',
   grip: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="5" r="1.6"/><circle cx="15" cy="5" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="19" r="1.6"/><circle cx="15" cy="19" r="1.6"/></svg>',
+  play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15a1 1 0 0 0 1.5.87l12-7.5a1 1 0 0 0 0-1.74l-12-7.5A1 1 0 0 0 7 4.5Z"/></svg>',
 };
 
 const WIDGET_META = {
@@ -857,7 +858,6 @@ function listaRegioesMarkup(inst) {
     <div class="lista-scroll is-recuada">
       ${itens.length === 0 ? `<div class="lista-vazio">Nenhuma região encontrada.</div>` : `
       <table class="lista-tabela">
-        <thead><tr><th>${tab === "subareas" ? "Subárea" : "Corredor"}</th></tr></thead>
         <tbody>
           ${itens.map((r) => `
             <tr class="${linhaSelecionada(tipoAlvo, r.id) ? "is-selecionada" : ""}" data-action="lista-row" data-id="${inst.id}" data-tipo="${tipoAlvo}" data-alvo="${r.id}">

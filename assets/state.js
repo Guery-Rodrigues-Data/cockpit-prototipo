@@ -57,6 +57,8 @@ const LiveState = (() => {
     if (candidatos.length === 0) return;
     const alvo = candidatos[Math.floor(Math.random() * candidatos.length)];
     const atualizado = { ...alvo, online: !alvo.online };
+    // guarda o momento em que deixou de comunicar (a aba Geral mostra como "Última comunicação")
+    if (!atualizado.online) atualizado.ultimaComunicacao = Date.now();
     equipamentos = equipamentos.map((e) => (e.id === alvo.id ? atualizado : e));
 
     if (!atualizado.online) {

@@ -92,6 +92,11 @@ const ALERTAS = [
   { id: "ALR-9010", equipamentoId: "SEM-1006", descricao: "Tempo de verde divergente do plano vigente", severidade: "Médio", dataHora: "09/09/2026 09:10" },
   { id: "ALR-9011", equipamentoId: "RAD-3001", descricao: "Autoteste diário pendente de confirmação", severidade: "Baixo", dataHora: "09/09/2026 06:20" },
   { id: "ALR-9012", equipamentoId: "CAM-2004", descricao: "Cartão de armazenamento com 90% de uso", severidade: "Baixo", dataHora: "09/09/2026 08:05" },
+  // Fixos no CT-2962 (controlador real, vem do Supabase) pra ter sempre alerta pra olhar
+  // enquanto mexemos na aba Alertas — descrição e tipo batem com ALARMES_CATALOGO (assets/alarmes.js).
+  { id: "ALR-9013", equipamentoId: "CT-2962", tipoAlarme: "comunicacao", descricao: "Falha na comunicação com o dispositivo", severidade: "Alto", dataHora: "22/09/2026 09:40" },
+  // Médio/Baixo tirados por enquanto (ALR-9014/9015) — só o Alto fica, pra simplificar
+  // enquanto mexemos na aba.
 ];
 
 /* ---------- Helpers de leitura (puros — não mexem em estado global) ---------- */
