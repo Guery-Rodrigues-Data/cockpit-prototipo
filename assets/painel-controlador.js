@@ -571,16 +571,53 @@ const PainelControlador = (() => {
   // Entreverdes lido do print (HIPÓTESE): 5 s = 4 s de amarelo + 1 s de vermelho geral no veicular.
   const ENTREVERDES = 5, AMARELO = 4;
   Object.values(PLANOS_EXEMPLO).forEach((p) => (p.ciclo = p.est.reduce((a, b) => a + b, 0) + ENTREVERDES * p.est.length));
-  // Tabela horária por DIA DA SEMANA, em minutos [início, fim, plano]. Tem plano que só roda em
-  // alguns dias (ex.: Pico manhã/tarde só em dia útil; Plano 8 só na sexta; Plano 6 só no sábado). HIPÓTESE ainda não
-  // validada: feriado — se o DP40 tratar feriado como um "dia" próprio, entra uma linha a mais.
-  const SEG_QUI = [[0, 300, 5], [300, 390, 2], [390, 420, 9], [420, 540, 1], [540, 720, 4], [720, 840, 7], [840, 960, 4], [960, 1020, 2], [1020, 1170, 3], [1170, 1320, 10], [1320, 1440, 5]];
-  const SEXTA = [[0, 300, 5], [300, 390, 2], [390, 420, 9], [420, 540, 1], [540, 720, 4], [720, 840, 7], [840, 990, 4], [990, 1200, 8], [1200, 1320, 11], [1320, 1440, 5]];
-  const SABADO = [[0, 360, 12], [360, 600, 2], [600, 840, 6], [840, 1080, 13], [1080, 1380, 10], [1380, 1440, 12]];
-  const DOMINGO = [[0, 420, 12], [420, 660, 14], [660, 1080, 15], [1080, 1320, 2], [1320, 1440, 12]];
-  // O Plano 16 (Evento / jogo) não aparece em dia nenhum: HIPÓTESE de que existe plano que só
-  // entra por imposição manual. Confirmar se isso acontece no DP40.
-  const TABELA_SEMANA = { 0: DOMINGO, 1: SEG_QUI, 2: SEG_QUI, 3: SEG_QUI, 4: SEG_QUI, 5: SEXTA, 6: SABADO };
+  // Horários dos planos no mesmo formato do Programador DP40 (tela de horários): cada linha diz
+  // qual plano roda, em quais dias da semana (0 = Dom … 6 = Sáb), de que horas até que horas.
+  // A configuração do plano (estrutura, defasagem, estágios…) fica separada, em PLANOS_EXEMPLO.
+  // A grade da semana (TABELA_SEMANA) é só derivada disto. Exemplo inventado; o que o cadastro
+  // real faz com buraco (horário sem plano), sobreposição e horário que vira a meia-noite ainda
+  // é pendência — aqui as linhas cobrem o dia inteiro, sem sobrepor.
+  const SEG_SEX = [1, 2, 3, 4, 5], SEG_QUI = [1, 2, 3, 4], SEX = [5], SAB = [6], DOM = [0];
+  const HORARIOS_PLANOS = [
+    { plano: 5, dias: SEG_SEX, inicio: "00:00", fim: "05:00" },
+    { plano: 2, dias: SEG_SEX, inicio: "05:00", fim: "06:30" },
+    { plano: 9, dias: SEG_SEX, inicio: "06:30", fim: "07:00" },
+    { plano: 1, dias: SEG_SEX, inicio: "07:00", fim: "09:00" },
+    { plano: 4, dias: SEG_SEX, inicio: "09:00", fim: "12:00" },
+    { plano: 7, dias: SEG_SEX, inicio: "12:00", fim: "14:00" },
+    { plano: 4, dias: SEG_QUI, inicio: "14:00", fim: "16:00" },
+    { plano: 2, dias: SEG_QUI, inicio: "16:00", fim: "17:00" },
+    { plano: 3, dias: SEG_QUI, inicio: "17:00", fim: "19:30" },
+    { plano: 10, dias: SEG_QUI, inicio: "19:30", fim: "22:00" },
+    { plano: 4, dias: SEX, inicio: "14:00", fim: "16:30" },
+    { plano: 8, dias: SEX, inicio: "16:30", fim: "20:00" },
+    { plano: 11, dias: SEX, inicio: "20:00", fim: "22:00" },
+    { plano: 5, dias: SEG_SEX, inicio: "22:00", fim: "24:00" },
+    { plano: 12, dias: SAB, inicio: "00:00", fim: "06:00" },
+    { plano: 2, dias: SAB, inicio: "06:00", fim: "10:00" },
+    { plano: 6, dias: SAB, inicio: "10:00", fim: "14:00" },
+    { plano: 13, dias: SAB, inicio: "14:00", fim: "18:00" },
+    { plano: 10, dias: SAB, inicio: "18:00", fim: "23:00" },
+    { plano: 12, dias: SAB, inicio: "23:00", fim: "24:00" },
+    { plano: 12, dias: DOM, inicio: "00:00", fim: "07:00" },
+    { plano: 14, dias: DOM, inicio: "07:00", fim: "11:00" },
+    { plano: 15, dias: DOM, inicio: "11:00", fim: "18:00" },
+    { plano: 2, dias: DOM, inicio: "18:00", fim: "22:00" },
+    { plano: 12, dias: DOM, inicio: "22:00", fim: "24:00" },
+  ];
+  // O Plano 16 (Evento / jogo) não tem horário: HIPÓTESE de que existe plano que só entra por
+  // imposição manual. Confirmar se isso acontece no DP40.
+  const emMinutos = (hhmm) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + m; };
+  // Grade por dia [início, fim, plano] em minutos, montada uma vez (as faixas são comparadas por
+  // identidade no relógio da aba, então não pode ser recriada a cada leitura).
+  const TABELA_SEMANA = Object.fromEntries(
+    [0, 1, 2, 3, 4, 5, 6].map((d) => [
+      d,
+      HORARIOS_PLANOS.filter((h) => h.dias.includes(d))
+        .map((h) => [emMinutos(h.inicio), emMinutos(h.fim), h.plano])
+        .sort((x, y) => x[0] - y[0]),
+    ])
+  );
   const DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
   const ORDEM_SEMANA = [1, 2, 3, 4, 5, 6, 0]; // semana começando na segunda
   // Estrutura = quais grupos ficam verdes em cada estágio (HIPÓTESE NÃO VALIDADA sobre o campo
@@ -610,18 +647,6 @@ const PainelControlador = (() => {
   const segDoDia = () => { const d = new Date(); return d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds() + d.getMilliseconds() / 1000; };
   const hoje = () => new Date().getDay();
   const faixaAgora = () => { const m = Math.floor(segDoDia() / 60); return TABELA_SEMANA[hoje()].find((f) => m >= f[0] && m < f[1]); };
-  // Próxima troca de plano, olhando o resto de hoje e, se preciso, os dias seguintes.
-  function proximaTroca() {
-    const atual = faixaAgora();
-    for (let k = 0; k < 8; k++) {
-      const d = (hoje() + k) % 7;
-      for (const f of TABELA_SEMANA[d]) {
-        if (k === 0 && f[0] <= atual[0]) continue;
-        if (f[2] !== atual[2]) return { quando: k === 0 ? "" : k === 1 ? "amanhã" : DIAS[d], ini: f[0], num: f[2] };
-      }
-    }
-    return { quando: "", ini: atual[1], num: atual[2] };
-  }
   // "Seg–Sex 07:00–09:00", "Sáb 10:00–14:00": junta dias seguidos com os mesmos horários.
   function quandoRoda(num) {
     const grupos = [];
@@ -727,7 +752,7 @@ const PainelControlador = (() => {
           <span><i style="background:var(--plano-verde)"></i>Verde</span>
           <span><i style="background:var(--plano-amarelo)"></i>Amarelo</span>
           <span><i style="background:var(--plano-vermelho)"></i>Vermelho</span>
-          <span><i class="is-interm"></i>Vermelho intermitente</span>
+          <span title="Vermelho intermitente (pedestre)"><i class="is-interm"></i>Intermitente</span>
         </div>`;
 
   // Painel: só o plano em curso (o olhar rápido). Ver os outros planos e a semana fica no modal.
@@ -737,29 +762,45 @@ const PainelControlador = (() => {
     // Offline: não há leitura do equipamento, então o que aparece é o previsto pela tabela
     // horária — sem cursor, pra não passar posição de ciclo como se fosse dado de campo.
     const aoVivo = eq.online;
-    const prox = proximaTroca();
-    const pp = PLANOS_EXEMPLO[prox.num];
 
-    const planosHoje = `
-        <div class="sel-campos">${campo("Próxima troca", forte(`${prox.quando ? `${prox.quando} ` : ""}${hm(prox.ini)} → Plano ${pp.num} · ${pp.desc}`), true)}</div>
-        <div class="plano-agenda">${barraDia(hoje())}${horasMarkup([0, 6, 12, 18, 24])}</div>
-        <p class="sel-nota">Planos, horários e descrições de exemplo — o sistema atual só tem o número do plano.</p>`;
 
     return `
       <div class="sel-bloco" id="planoAba">
         ${!eq.online ? '<div class="sel-aviso">Controlador offline: mostrando o plano previsto pela tabela horária, não o que ele está executando.</div>' : ""}
+        <div class="plano-cabecalho">
+          <div class="plano-cabecalho-txt">
+            <h4>Plano ${p.num} · ${p.desc}</h4>
+            <span>${p.modo}</span>
+          </div>
+          ${seloPlano(true, eq.online)}
+        </div>
         <div class="sel-campos">
-          ${campo("Plano", forte(`${p.num} · ${p.desc}`))}
-          ${campo("Situação", seloPlano(true, eq.online))}
-          ${campo("Ciclo", aoVivo ? forte("—", "js-plano-ciclo") : forte(`${p.ciclo}s`))}
-          ${campo("Estágio", aoVivo ? forte("—", "js-plano-estagio") : "<em>Sem leitura</em>")}
-          ${campo("Defasagem", forte(`${p.def}s`))}
           ${campo("Vigência", forte(`${hm(faixa[0])}–${hm(faixa[1])}`))}
+          ${campo("Ciclo programado", forte(`${p.ciclo}s`))}
+          ${campo("Sincronismo", aoVivo ? forte(OPERACAO_EXEMPLO.sincronismo) : "<em>Sem leitura</em>")}
+          ${campo("Defasagem", forte(`${p.def}s`))}
+          ${campo("Seleção", aoVivo ? forte(OPERACAO_EXEMPLO.selecao) : "<em>Sem leitura</em>")}
+          ${campo("Requisitado", aoVivo ? forte(OPERACAO_EXEMPLO.requisitado) : "<em>Sem leitura</em>")}
+          ${campo("Estrutura", forte(p.estrutura))}
+          ${campo("Estabilização", "<em>Sem dado</em>")}
+          ${campo("Derivativo subárea", p.derivSubarea ? forte(p.derivSubarea) : "<em>Nenhum</em>")}
+          ${campo("Derivativo local", p.derivLocal ? forte(p.derivLocal) : "<em>Nenhum</em>")}
         </div>
       </div>
-      ${secaoMarkup("plano-diagrama", "Diagrama do ciclo", diagramaMarkup(p, aoVivo) + legendaMarkup())}
-      ${secaoMarkup("plano-dia", `Planos de hoje · ${DIAS[hoje()]}`, planosHoje)}
+      ${secaoMarkup(
+        "plano-diagrama",
+        "Diagrama do ciclo",
+        // ciclo e etapa ao vivo ficam colados no diagrama: são a leitura do cursor que anda nele
+        diagramaMarkup(p, aoVivo) +
+          `<div class="sel-campos plano-diag-leitura">
+            ${campo("Ciclo", aoVivo ? forte("—", "js-plano-ciclo") : "<em>Sem leitura</em>")}
+            ${campo("Etapa", aoVivo ? forte("—", "js-plano-estagio") : "<em>Sem leitura</em>")}
+          </div>` +
+          legendaMarkup()
+      )}
       <div class="sel-croqui-atalho"><button type="button" class="btn-text" data-plano-abrir="">Ver todos os planos</button></div>`;
+      // A faixa de 24h dos planos de hoje saiu do painel (com 10+ planos não cabe em 340px e
+      // repetia o modal). A semana inteira, com detalhe, fica em "Ver todos os planos".
   }
 
   /* ---------- Modal "Planos do controlador": todos os planos, só visualização ---------- */
