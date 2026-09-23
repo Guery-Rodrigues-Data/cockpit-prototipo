@@ -181,9 +181,9 @@ const PainelControlador = (() => {
     return `<div class="sel-campos">
       ${campo("Modo", `<strong>${PLANOS_EXEMPLO[faixaAgora()[2]].modo}</strong>`, true)}
       ${campo("Subárea lógica", `<strong>${OPERACAO_EXEMPLO.subareaLogica}</strong>`)}
-      ${campo("Subárea do sistema", sub ? `<strong>${sub}</strong>` : "<em>Fora de subárea</em>")}
+      ${campo("Subárea do sistema", `<strong>${sub || "Fora de subárea"}</strong>`)}
       ${campo("Seleção", `<strong>${OPERACAO_EXEMPLO.selecao}</strong>`)}
-      ${campo("Corredor", cor ? `<strong>${cor}</strong>` : "<em>Fora de corredor</em>")}
+      ${campo("Corredor", `<strong>${cor || "Fora de corredor"}</strong>`)}
       ${campo("Status", `<strong>${OPERACAO_EXEMPLO.statusModo}</strong>`)}
     </div>`;
   }
@@ -211,12 +211,12 @@ const PainelControlador = (() => {
   // croqui.html, não editor-croqui.html — quem vem do Cockpit não deve editar o croqui por
   // acidente).
   //
-  // FIXO POR ENQUANTO: sempre leva pro mesmo croqui de exemplo (CRQ-2260/CT-2260), pedido do
+  // FIXO POR ENQUANTO: sempre leva pro mesmo croqui de exemplo (CRQ-2260/302260), pedido do
   // Guery pra ter uma referência estável enquanto mexemos nisso — ainda não é por controlador
   // de verdade (isso usaria cacheGrupos, igual a aba Grupos, mas tá comentado embaixo pra
   // quando for a hora de ligar de novo).
   function croquiAtalhoMarkup(eq) {
-    const url = `${URL_CROQUI}apresentacao-croqui.html?id=CRQ-2260&ct=CT-2260`;
+    const url = `${URL_CROQUI}apresentacao-croqui.html?id=CRQ-2260&ct=302260`;
     return `<div class="sel-croqui-atalho"><a class="btn-text" href="${url}" target="_blank" rel="noopener">Ver croqui cadastrado</a></div>`;
     // const c = cacheGrupos.get(eq.id);
     // if (!c || c.estado !== "ok" || !c.croquis.length) return "";
