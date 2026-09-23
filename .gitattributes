@@ -1,0 +1,18 @@
+# Quebra de linha igual em qualquer máquina (Windows/Mac): o repositório guarda LF e cada
+# checkout também fica em LF. Sem isso, uma máquina com core.autocrlf diferente transforma um
+# ajuste de uma linha em "arquivo inteiro alterado" — e o conflito fica ilegível.
+* text=auto eol=lf
+
+# Scripts do PowerShell rodam melhor com CRLF no Windows
+*.ps1 text eol=crlf
+
+# Binários: nunca mexer em quebra de linha nem tentar mesclar
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
+*.woff binary
+*.woff2 binary

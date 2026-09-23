@@ -53,3 +53,25 @@ commit pelas Environment Variables `SITE_USUARIO` / `SITE_SENHA` no projeto da V
 Compartilhamento de tela entre usuários, mais de uma tela por usuário, widgets de série
 temporal, exportação PDF/PNG, tela detalhada de Alertas (o botão "Ver tudo" só mostra um
 toast) — mesmos recortes do `00 - epic - Cockpit.md`.
+
+## Trabalhando em equipe (mais de uma pessoa no repo)
+
+**Fluxo:** ninguém faz commit direto no `main` — a Vercel publica o `main`. Cada tarefa vai
+numa branch curta e entra por Pull Request:
+
+```bash
+git checkout main && git pull           # sempre partir do main atualizado
+git checkout -b ux/nome-curto-da-tarefa # prefixo por pessoa/área: ux/, produto/
+# ...altera, testa local...
+git add -A && git commit -m "O que mudou, em uma linha"
+git push -u origin ux/nome-curto-da-tarefa
+# abre o Pull Request no GitHub -> a Vercel gera um link de prévia -> revisão -> merge
+```
+
+**Pra não dar conflito:**
+- Branch de 1–2 dias, não de semanas. Antes de abrir o PR: `git pull origin main` na branch.
+- Combinar quem mexe em quê nos arquivos grandes: `assets/painel-controlador.js`, `assets/app.js`, `assets/style.css`.
+- Quebra de linha já está padronizada pelo `.gitattributes` (LF) — não mudar `core.autocrlf`
+  pra "consertar" aviso de CRLF.
+- O Supabase é compartilhado entre as máquinas: mudança de tabela/migração, uma pessoa só roda
+  e avisa antes.
