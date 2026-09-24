@@ -50,7 +50,9 @@
     <span class="admin-dock-tag">Admin</span>
     <button type="button" data-adm="novo-corredor">${ICONS.plus} Corredor</button>
     <button type="button" data-adm="novo-area">${ICONS.plus} Área</button>
-    <button type="button" data-adm="lista">Cadastrados <span class="admin-dock-count" id="admContagem"></span></button>`;
+    <button type="button" data-adm="lista">Cadastrados <span class="admin-dock-count" id="admContagem"></span></button>
+    <span class="admin-dock-sep"></span>
+    <button type="button" data-adm="telas">Telas</button>`;
 
   const barra = document.createElement("div");
   barra.className = "admin-drawbar";
@@ -60,13 +62,41 @@
   painel.className = "admin-lista";
   painel.hidden = true;
 
-  document.body.append(dock, barra, painel);
+  // Telas de exemplo (PRESETS em app.js) + Limpar Cockpit: ferramenta de teste, por isso moram
+  // no dock do admin e não no menu do avatar. Os cliques são tratados em app.js
+  // (data-action load-preset / clear-layout), como antes.
+  const painelTelas = document.createElement("div");
+  painelTelas.className = "admin-lista admin-telas";
+  painelTelas.hidden = true;
+  painelTelas.innerHTML = `
+    <h4>Telas de exemplo</h4>
+    ${PRESETS.map(
+      (p) => `
+      <button type="button" class="admin-tela" data-action="load-preset" data-preset="${p.id}">
+        <strong>${p.nome}</strong><span>${p.descricao}</span>
+      </button>`
+    ).join("")}
+    <div class="admin-telas-rodape">
+      <button type="button" class="btn-text" data-action="clear-layout" title="Remove todos os widgets desta tela, volta ao primeiro acesso">Limpar Cockpit</button>
+    </div>`;
+  let telasAbertas = false;
+
+  document.body.append(dock, barra, painel, painelTelas);
   document.body.classList.add("modo-admin"); // admin.css reserva o espaço do dock embaixo do canvas
 
   function atualizarDock() {
     const { corredores, areas } = cadastrados();
     document.getElementById("admContagem").textContent = corredores.length + areas.length;
     dock.querySelector('[data-adm="lista"]').classList.toggle("is-on", listaAberta);
+    dock.querySelector('[data-adm="telas"]').classList.toggle("is-on", telasAbertas);
+  }
+
+  // Telas e Cadastrados abrem no mesmo canto: um fecha o outro.
+  function alternarTelas(abrir) {
+    telasAbertas = abrir === undefined ? !telasAbertas : abrir;
+    painelTelas.hidden = !telasAbertas;
+    if (telasAbertas && listaAberta) alternarLista(false);
+    atualizarDock();
   }
 
   /* ---------- desenho no mapa ---------- */
@@ -250,7 +280,7 @@
         melhor = e;
       }
     });
-    return melhor ? desescapar(melhor.nome).replace(/^Sem\.\s*/, "") : null;
+    return melhor ? desescapar(melhor.nome) : null;
   }
 
   // Rua no ponto pelo OpenStreetMap (Nominatim, consulta pública gratuita); se não responder,
@@ -378,6 +408,7 @@
   function alternarLista(abrir) {
     listaAberta = abrir === undefined ? !listaAberta : abrir;
     painel.hidden = !listaAberta;
+    if (listaAberta && telasAbertas) alternarTelas(false);
     if (listaAberta) renderLista();
     atualizarDock();
   }
@@ -403,25 +434,7 @@
       ${corredores.length ? corredores.map((c) => linhaMarkup("corredor", c)).join("") : '<div class="admin-vazio">Nenhum corredor cadastrado.</div>'}
       <h4>Áreas</h4>
       ${areas.length ? areas.map((a) => linhaMarkup("area", a)).join("") : '<div class="admin-vazio">Nenhuma área cadastrada.</div>'}
-      <div class="admin-dica">Dica: clique numa linha ou área cadastrada no mapa; o painel lateral tem Renomear e Excluir.</div>`;
-  }
-
-  /* ---------- ações no painel lateral do Mapa ---------- */
-
-  // Clicar numa região cadastrada no mapa abre o painel lateral (painel-selecao.js); no modo
-  // admin ele ganha Renomear/Excluir. O contêiner .admin-pop é o mesmo que a lista usa, então
-  // os handlers de renomear/excluir abaixo servem aos dois.
-  function acoesNoPainel(sel) {
-    if (sel.tipo === "equipamento") return "";
-    const reg = (sel.tipo === "subarea" ? SUBAREAS : CORREDORES).find((r) => r.id === sel.id);
-    if (!reg || !reg.cadastrado) return "";
-    return `
-      <div class="admin-pop" data-tipo="${sel.tipo === "corredor" ? "corredor" : "area"}" data-id="${reg.id}">
-        <div class="admin-row-acts">
-          <button type="button" data-adm="renomear">Renomear</button>
-          <button type="button" data-adm="excluir" class="is-danger">Excluir</button>
-        </div>
-      </div>`;
+      <div class="admin-dica">Renomear e Excluir ficam só aqui, no modo admin; o painel lateral do Mapa não tem essas ações.</div>`;
   }
 
   function editarNome(linha) {
@@ -451,7 +464,7 @@
     }
     aoMudarRegioes();
     renderLista();
-    CockpitMap.reemitirSelecao(); // redesenha o painel lateral com o nome novo
+    CockpitMap.reemitirSelecao(); // se a região estiver aberta no painel lateral, mostra o nome novo
     toast("Nome atualizado.");
   }
 
@@ -483,13 +496,15 @@
   /* ---------- eventos ---------- */
 
   document.addEventListener("click", (e) => {
+    if (e.target.closest(".admin-telas [data-action]")) return alternarTelas(false);
     const alvo = e.target.closest("[data-adm]");
     if (!alvo) return;
-    const linha = alvo.closest(".admin-row, .admin-pop");
+    const linha = alvo.closest(".admin-row");
     switch (alvo.dataset.adm) {
       case "novo-corredor": return iniciarDesenho("corredor");
       case "novo-area": return iniciarDesenho("area");
       case "lista": return alternarLista();
+      case "telas": return alternarTelas();
       case "desfazer": return desfazerPonto();
       case "concluir": return concluirDesenho();
       case "cancelar": return encerrarDesenho();
@@ -499,7 +514,7 @@
         return CockpitBus.focarRegiao(linha.dataset.tipo === "corredor" ? "corredor" : "subarea", linha.dataset.id);
       case "renomear": return editarNome(linha);
       case "renomear-salvar": return salvarNome(linha);
-      case "renomear-cancelar": return linha.classList.contains("admin-pop") ? CockpitMap.reemitirSelecao() : renderLista();
+      case "renomear-cancelar": return renderLista();
       case "excluir": return excluir(alvo, linha);
     }
   });
@@ -515,7 +530,7 @@
       if (overlay && e.target.matches?.("#admNome, #admRaio")) return salvarFormulario();
       if (!overlay && desenho && !digitando) return concluirDesenho();
       const linha = e.target.closest && e.target.closest(".admin-row-edit");
-      if (linha) return salvarNome(linha.closest(".admin-row, .admin-pop"));
+      if (linha) return salvarNome(linha.closest(".admin-row"));
     }
     if (!overlay && desenho && !digitando && (e.key === "Backspace" || (e.key === "z" && (e.ctrlKey || e.metaKey)))) {
       e.preventDefault();
@@ -523,6 +538,5 @@
     }
   });
 
-  PainelSelecao.definirAcoesExtras(acoesNoPainel);
   atualizarDock();
 })();

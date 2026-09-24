@@ -137,7 +137,7 @@ const PainelControlador = (() => {
   // operacional e modo de operação têm seção própria logo abaixo. "Última comunicação" fica
   // fixa no rodapé do painel (ver rodapeMarkup), visível em qualquer aba, não só na Geral.
   function identificacaoMarkup(eq) {
-    return `<div class="sel-campos">
+    return `<div class="sel-campos is-esq-larga">
       ${campo("Tipo", "<strong>Controlador</strong>")}
       ${campo("Modelo", `<strong>${DETALHES_EXEMPLO.modelo}</strong>`)}
       ${campo("Fabricante", `<strong>${DETALHES_EXEMPLO.fabricante}</strong>`)}
@@ -164,7 +164,7 @@ const PainelControlador = (() => {
     const agora = new Date();
     const desvioS = (eq.id.charCodeAt(eq.id.length - 1) % 12) - 6;
     const equipamento = new Date(agora.getTime() + desvioS * 1000);
-    return `<div class="sel-campos">
+    return `<div class="sel-campos is-esq-larga">
       ${campo("Porta do equipamento", `<strong>${OPERACAO_EXEMPLO.portaEquipamento}</strong>`)}
       ${campo("Programação", `<strong>${OPERACAO_EXEMPLO.programacao}</strong>`)}
       ${campo("Horário do equipamento", `<strong>${fmtHora(equipamento)}</strong>`)}
@@ -178,10 +178,11 @@ const PainelControlador = (() => {
   function modoOperacaoMarkup(eq) {
     const sub = eq.subareaId ? nomeSubarea(eq.subareaId) : null;
     const cor = eq.corredorId ? nomeCorredor(eq.corredorId) : null;
-    return `<div class="sel-campos">
+    // Sem o código ("SA06 - "), como na lista de Subáreas; o nome oficial completo fica no title.
+    return `<div class="sel-campos is-esq-larga">
       ${campo("Modo", `<strong>${PLANOS_EXEMPLO[faixaAgora()[2]].modo}</strong>`, true)}
+      ${campo("Subárea do sistema", `<strong class="sel-uma-linha" title="${sub || "Fora de subárea"}">${sub ? nomeSemCodigo(sub) : "Fora de subárea"}</strong>`)}
       ${campo("Subárea lógica", `<strong>${OPERACAO_EXEMPLO.subareaLogica}</strong>`)}
-      ${campo("Subárea do sistema", `<strong>${sub || "Fora de subárea"}</strong>`)}
       ${campo("Seleção", `<strong>${OPERACAO_EXEMPLO.selecao}</strong>`)}
       ${campo("Corredor", `<strong>${cor || "Fora de corredor"}</strong>`)}
       ${campo("Status", `<strong>${OPERACAO_EXEMPLO.statusModo}</strong>`)}
@@ -200,7 +201,7 @@ const PainelControlador = (() => {
   function enderecoMarkup(eq) {
     const e = cacheEndereco.get(eq.id) || { estado: "carregando" };
     const buscando = e.estado === "carregando" ? "<em>Buscando...</em>" : null;
-    return `<div class="sel-campos">
+    return `<div class="sel-campos is-esq-larga">
       ${campo("Logradouro", buscando || valor(e.rua), true)}
       ${campo("Bairro", buscando || valor(e.bairro))}
       ${campo("Coordenadas", `<strong class="sel-mono">${eq.lat.toFixed(5)}, ${eq.lng.toFixed(5)}</strong>`)}
@@ -363,12 +364,11 @@ const PainelControlador = (() => {
   const fmtDataHora = (d) =>
     `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} - ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
   const fmtHora = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-  const cruzamentoDe = (eq) => eq.nome.replace(/^Sem\.\s*/, "");
 
   // "Cruzamento: rua x rua" em vermelho + "Controlador - id", igual nos modais dos prints
   function cabecalhoResultado(eq, rotulo = "Cruzamento") {
     return `
-      <div class="cmd-cruz"><span class="cmd-rotulo">${rotulo}:</span> ${cruzamentoDe(eq)}</div>
+      <div class="cmd-cruz"><span class="cmd-rotulo">${rotulo}:</span> ${eq.nome}</div>
       <div class="cmd-ctrl">Controlador - ${eq.id}</div>`;
   }
 
@@ -656,7 +656,8 @@ const PainelControlador = (() => {
       if (g && g.k === k) g.fim = d;
       else grupos.push({ ini: d, fim: d, k });
     }
-    return grupos.filter((g) => g.k).map((g) => `${DIAS[g.ini]}${g.ini !== g.fim ? `–${DIAS[g.fim]}` : ""} ${g.k}`);
+    // "Seg a Sex" (e não "Seg–Sex"): o traço fica só nos horários, pra não confundir as duas faixas
+    return grupos.filter((g) => g.k).map((g) => ({ dias: `${DIAS[g.ini]}${g.ini !== g.fim ? ` a ${DIAS[g.fim]}` : ""}`, horarios: g.k }));
   }
   const posNoCiclo = (p) => (((segDoDia() - p.def) % p.ciclo) + p.ciclo) % p.ciclo;
 
@@ -692,7 +693,17 @@ const PainelControlador = (() => {
   // Diagrama de barras como no sistema atual (uma linha por grupo, eixo = ciclo). `largura` muda
   // entre o painel (312) e o modal. O cursor é movido pelo relógio abaixo, sem refazer o SVG.
   const DL = 24, DR = 4, DTOPO = 18, DGAP = 4;
-  function diagramaMarkup(p, aoVivo, largura = 312, altLinha = 20) {
+  // Largura útil do diagrama no painel lateral: a mesma conta do CSS de .map-selecao
+  // (30% do mapa, entre 340 e 420px) menos bordas e padding. Desenhar o SVG já na largura
+  // real mantém o texto do tamanho certo em vez de esticar junto com o viewBox.
+  function larguraDiagramaPainel() {
+    const mapaW = document.querySelector(".map-selecao")?.parentElement?.clientWidth;
+    if (!mapaW) return 312;
+    const painelW = Math.min(Math.max(340, mapaW * 0.3), 420, mapaW - 20);
+    return Math.round(painelW) - 42; // 2px de borda + 20px de padding de cada lado (.sel-dados)
+  }
+
+  function diagramaMarkup(p, aoVivo, largura = larguraDiagramaPainel(), altLinha = 20) {
     const DW = largura, DLINHA = altLinha;
     const iw = DW - DL - DR, x = (t) => DL + (t / p.ciclo) * iw;
     const grupos = gruposDo(p);
@@ -755,7 +766,9 @@ const PainelControlador = (() => {
           <span title="Vermelho intermitente (pedestre)"><i class="is-interm"></i>Intermitente</span>
         </div>`;
 
-  // Painel: só o plano em curso (o olhar rápido). Ver os outros planos e a semana fica no modal.
+  // Painel: só o plano em curso (o olhar rápido). Estrutura, derivativos, Seleção e Requisitado
+  // ficam só no modal, junto com os outros planos e a semana. Em vez do selo "Em curso", só uma
+  // bolinha no nome (verde = rodando; âmbar = offline, previsto) — o caso offline já tem o aviso.
   function planoMarkup(eq) {
     const faixa = faixaAgora();
     const p = PLANOS_EXEMPLO[faixa[2]];
@@ -767,24 +780,15 @@ const PainelControlador = (() => {
     return `
       <div class="sel-bloco" id="planoAba">
         ${!eq.online ? '<div class="sel-aviso">Controlador offline: mostrando o plano previsto pela tabela horária, não o que ele está executando.</div>' : ""}
-        <div class="plano-cabecalho">
-          <div class="plano-cabecalho-txt">
-            <h4>Plano ${p.num} · ${p.desc}</h4>
-            <span>${p.modo}</span>
-          </div>
-          ${seloPlano(true, eq.online)}
-        </div>
-        <div class="sel-campos">
+        <div class="sel-campos plano-resumo-campos">
+          ${campo(
+            "Plano",
+            `<strong class="plano-nome-vivo"><i class="plano-dot${eq.online ? "" : " is-previsto"}" title="${eq.online ? "Em curso" : "Previsto pela tabela horária"}" aria-label="${eq.online ? "Em curso" : "Previsto pela tabela horária"}"></i>Plano ${p.num} · ${p.desc}</strong>`
+          )}
           ${campo("Vigência", forte(`${hm(faixa[0])}–${hm(faixa[1])}`))}
-          ${campo("Ciclo programado", forte(`${p.ciclo}s`))}
+          ${campo("Modo de operação", forte(p.modo), true)}
           ${campo("Sincronismo", aoVivo ? forte(OPERACAO_EXEMPLO.sincronismo) : "<em>Sem leitura</em>")}
           ${campo("Defasagem", forte(`${p.def}s`))}
-          ${campo("Seleção", aoVivo ? forte(OPERACAO_EXEMPLO.selecao) : "<em>Sem leitura</em>")}
-          ${campo("Requisitado", aoVivo ? forte(OPERACAO_EXEMPLO.requisitado) : "<em>Sem leitura</em>")}
-          ${campo("Estrutura", forte(p.estrutura))}
-          ${campo("Estabilização", "<em>Sem dado</em>")}
-          ${campo("Derivativo subárea", p.derivSubarea ? forte(p.derivSubarea) : "<em>Nenhum</em>")}
-          ${campo("Derivativo local", p.derivLocal ? forte(p.derivLocal) : "<em>Nenhum</em>")}
         </div>
       </div>
       ${secaoMarkup(
@@ -798,15 +802,15 @@ const PainelControlador = (() => {
           </div>` +
           legendaMarkup()
       )}
-      <div class="sel-croqui-atalho"><button type="button" class="btn-text" data-plano-abrir="">Ver todos os planos</button></div>`;
+      <div class="sel-croqui-atalho plano-ver-todos"><button type="button" class="btn-text" data-plano-abrir="">Ver todos os planos</button></div>`;
       // A faixa de 24h dos planos de hoje saiu do painel (com 10+ planos não cabe em 340px e
       // repetia o modal). A semana inteira, com detalhe, fica em "Ver todos os planos".
   }
 
   /* ---------- Modal "Planos do controlador": todos os planos, só visualização ---------- */
 
-  // Três faixas, de cima pra baixo, uma por pergunta: QUAL plano (chips) → QUANDO roda (semana)
-  // → COMO é (detalhe + diagrama). Sem botão Salvar de propósito: nada aqui envia comando.
+  // De cima pra baixo: plano → tempos → diagrama → coordenação → quando roda (texto + semana)
+  // → outros planos (chips). Sem botão Salvar de propósito: nada aqui envia comando.
   function modalEl() {
     let el = document.getElementById("planoModal");
     if (!el) {
@@ -846,6 +850,14 @@ const PainelControlador = (() => {
             title="Plano ${q.num} · ${q.desc}${q.num === emCurso.num ? " (em curso)" : ""}" aria-label="Plano ${q.num}, ${q.desc}">${q.num}${q.num === emCurso.num ? '<span class="plano-chip-agora"></span>' : ""}</button>`
       )
       .join("");
+    // Lista no topo: troca de plano sem depender de descer até os chips.
+    const opcoes = Object.values(PLANOS_EXEMPLO)
+      .map(
+        (q) =>
+          // sem "Plano" (o rótulo antes do select já diz) e sem "(em curso)" (o selo ao lado já diz)
+          `<option value="${q.num}"${q.num === p.num ? " selected" : ""}>${q.num} · ${q.desc}${quandoRoda(q.num).length ? "" : " (fora da tabela)"}</option>`
+      )
+      .join("");
     const semana = ORDEM_SEMANA.map(
       (d) => `<div class="plano-semana-linha${d === hoje() ? " is-hoje" : ""}">
           <span class="plano-semana-dia">${DIAS[d]}${d === hoje() ? "<small>hoje</small>" : ""}</span>
@@ -857,55 +869,86 @@ const PainelControlador = (() => {
     modalEl().innerHTML = `
       <div class="config-modal plano-modal" role="dialog" aria-modal="true" aria-labelledby="planoModalTitulo">
         <div class="config-modal-header">
-          <div class="plano-modal-titulo"><strong id="planoModalTitulo">Planos do controlador</strong><span>${eq.id} · ${eq.nome}</span></div>
+          <div class="plano-modal-titulo"><strong id="planoModalTitulo">Planos</strong><span>${eq.nome} · ${eq.id}</span></div>
           <button type="button" class="widget-icon-btn" data-plano-fechar title="Fechar (Esc)" aria-label="Fechar">${ICONS.x}</button>
         </div>
         <div class="config-modal-body plano-modal-corpo">
-          <div class="plano-chips-linha"><h5 class="plano-modal-h">Plano</h5><div class="plano-chips" role="group" aria-label="Escolher plano para ver">${chips}</div></div>
+          <section class="plano-detalhe">
+            <!-- Ordem de leitura de quem programa semáforo: qual plano → tempos (ciclo, estágios,
+                 defasagem) → diagrama → coordenação com os vizinhos → quando roda (agenda, no fim).
+                 HIPÓTESE: validar com engenheiro de tráfego do cliente. -->
+            <!-- sem título nem rótulos: a lista já diz qual plano é e o selo diz se está rodando -->
+            <div class="plano-id">
+              <label class="plano-nav"><span>Plano</span><select class="plano-nav-select" data-plano-select aria-label="Escolher plano">${opcoes}</select></label>
+              ${seloPlano(ehEmCurso, eq.online)}
+            </div>
+            <div>
+              <h5 class="plano-modal-h">Tempos</h5>
+              <div class="sel-campos plano-config-campos">
+                ${campo("Ciclo", aoVivo ? forte("—", "js-plano-ciclo") : forte(`${p.ciclo}s`))}
+                ${campo("Defasagem", forte(`${p.def}s`))}
+                ${campo("Entreverdes", forte(`${ENTREVERDES}s por troca`))}
+                ${campo("Estrutura", forte(p.estrutura))}
+              </div>
+              <!-- em cartões que quebram linha: com muitos estágios cresce pra baixo sem empurrar os campos -->
+              <div class="plano-estagios">${p.est.map((d, i) => `<div class="plano-estagio"><span>E${i + 1}</span><strong>${d}s</strong></div>`).join("")}</div>
+            </div>
+            <div>
+              <h5 class="plano-modal-h">Diagrama do ciclo</h5>
+              ${diagramaMarkup(p, aoVivo, 752, 22)}
+              ${legendaMarkup()}
+            </div>
+            <div>
+              <h5 class="plano-modal-h">Coordenação</h5>
+              <div class="sel-campos plano-config-campos">
+                ${campo("Modo de operação", forte(p.modo))}
+                ${campo("Derivativo subárea", ou(p.derivSubarea))}
+                ${campo("Derivativo local", ou(p.derivLocal))}
+                ${
+                  // leituras do controlador: só existem para o plano que está rodando agora
+                  ehEmCurso
+                    ? campo("Seleção", aoVivo ? forte(OPERACAO_EXEMPLO.selecao) : "<em>Sem leitura</em>") +
+                      campo("Requisitado", aoVivo ? forte(OPERACAO_EXEMPLO.requisitado) : "<em>Sem leitura</em>")
+                    : ""
+                }
+              </div>
+            </div>
+          </section>
 
-          <section>
+          <section class="plano-quando">
             <h5 class="plano-modal-h">Quando roda</h5>
+            ${
+              quandoRoda(p.num).length
+                ? `<div class="plano-quando-lista">${quandoRoda(p.num).map((q) => `<span>${q.dias}</span><strong>${q.horarios}</strong>`).join("")}</div>`
+                : '<p class="plano-quando-fora">Fora da tabela horária — não roda sozinho em nenhum dia (só por imposição?)</p>'
+            }
             <div class="plano-semana">
               ${semana}
               <div class="plano-semana-linha is-eixo"><span class="plano-semana-dia"></span>${horasMarkup([0, 3, 6, 9, 12, 15, 18, 21, 24])}</div>
             </div>
-          </section>
-
-          <section class="plano-detalhe">
-            <div class="plano-detalhe-topo">
-              <div class="plano-detalhe-nome">
-                <strong class="plano-nome">Plano ${p.num} · ${p.desc}</strong>
-                <span>${quandoRoda(p.num).join("  ·  ") || "Fora da tabela horária — não roda sozinho em nenhum dia (só por imposição?)"}</span>
-              </div>
-              ${seloPlano(ehEmCurso, eq.online)}
-            </div>
-            <div class="plano-config">
-              <div class="sel-campos plano-config-campos">
-                ${campo("Estrutura", forte(p.estrutura))}
-                ${campo("Defasagem", forte(`${p.def}s`))}
-                ${campo("Ciclo", aoVivo ? forte("—", "js-plano-ciclo") : forte(`${p.ciclo}s`))}
-                ${campo("Entreverdes", forte(`${ENTREVERDES}s por troca`))}
-                ${campo("Derivativo subárea", ou(p.derivSubarea))}
-                ${campo("Derivativo local", ou(p.derivLocal))}
-                ${campo("Modo de operação", forte(p.modo), true)}
-              </div>
-              <table class="plano-estagios">
-                <thead><tr><th>Estágio</th><th>Duração</th></tr></thead>
-                <tbody>${p.est.map((d, i) => `<tr><td>E${i + 1}</td><td>${d}s</td></tr>`).join("")}</tbody>
-              </table>
-            </div>
-            <div>
-              <h5 class="plano-modal-h">Diagrama do ciclo</h5>
-              ${diagramaMarkup(p, aoVivo, 820, 24)}
-              ${legendaMarkup()}
-            </div>
+            <h5 class="plano-modal-h plano-outros-h">Outros planos</h5>
+            <div class="plano-chips" role="group" aria-label="Escolher plano para ver">${chips}</div>
           </section>
         </div>
         <div class="config-modal-actions plano-modal-acoes">
-          <span class="plano-modal-rodape">Só visualização — nada aqui altera o controlador. Planos e horários de exemplo.</span>
           <button type="button" class="btn-secondary" data-plano-fechar>Fechar</button>
         </div>
       </div>`;
+    ajustarLarguraPlano();
+  }
+
+  // Fallback de `field-sizing: content` (Safari/Firefox): a lista de plano fica da largura da
+  // opção escolhida, como o "Ordenar" da lista de Subáreas.
+  function ajustarLarguraPlano() {
+    if (CSS.supports("field-sizing", "content")) return;
+    const sel = modalEl().querySelector("[data-plano-select]");
+    if (!sel) return;
+    const medida = document.createElement("span");
+    medida.style.cssText = `position:absolute;visibility:hidden;white-space:nowrap;font:${getComputedStyle(sel).font}`;
+    medida.textContent = sel.options[sel.selectedIndex].text;
+    document.body.appendChild(medida);
+    sel.style.width = `${medida.offsetWidth + 24}px`;
+    medida.remove();
   }
 
   // Relógio da aba Plano e do modal: move cursor, "agora" e campos ao vivo sem refazer o HTML.
@@ -947,6 +990,12 @@ const PainelControlador = (() => {
       return;
     }
     if (e.target.closest("[data-plano-fechar]") || e.target.id === "planoModal") fecharModal();
+  });
+  document.addEventListener("change", (e) => {
+    if (!planoModal || !e.target.matches("[data-plano-select]")) return;
+    planoModal.num = Number(e.target.value);
+    renderModal();
+    modalEl().querySelector("[data-plano-select]")?.focus(); // o render refaz o HTML; devolve o foco
   });
   // Com 16 planos não dá pra achar "onde mais esse plano roda" de olho: o hover acende todos os
   // blocos (e o botão) do mesmo número.
@@ -1016,5 +1065,6 @@ const PainelControlador = (() => {
     }
   });
 
-  return { abas, dados, carregarGrupos, statusTag, rodapeMarkup };
+  // secaoMarkup e campo também servem o painel da área (painel-selecao.js), no mesmo visual da Geral
+  return { abas, dados, carregarGrupos, statusTag, rodapeMarkup, secaoMarkup, campo };
 })();

@@ -10,7 +10,6 @@
    ========================================================================== */
 
 const PainelSelecao = (() => {
-  let acoesExtras = null; // (sel) => html; o modo admin acrescenta Renomear/Excluir
   let abaAtiva = "geral"; // aba do painel de controlador; mantida ao passar de um controlador para outro
 
   const painelEl = () => document.querySelector(".map-selecao");
@@ -56,12 +55,14 @@ const PainelSelecao = (() => {
       </div>`;
   }
 
+  // Mesmo visual da aba Geral do controlador: bloco de campos no topo + seções recolhíveis.
   function dadosRegiaoMarkup(tipo, reg) {
+    const { campo, secaoMarkup } = PainelControlador;
+    const forte = (v, alerta) => `<strong${alerta ? ' class="sel-valor-alerta"' : ""}>${v}</strong>`;
     const eqs = equipamentosDaRegiao(tipo, reg.id);
     const offline = eqs.filter((e) => !e.online).length;
     const idsRegiao = new Set(eqs.map((e) => e.id));
     const alertas = LiveState.getAlertas().filter((a) => idsRegiao.has(a.equipamentoId));
-    const porSeveridade = SEVERIDADES.map((sev) => [sev, alertas.filter((a) => a.severidade === sev).length]).filter(([, n]) => n > 0);
     const porCategoria = CATEGORIAS_EQUIPAMENTO.map((c) => {
       const lista = eqs.filter((e) => e.tipo === c.id);
       return { c, total: lista.length, off: lista.filter((e) => !e.online).length };
@@ -71,46 +72,32 @@ const PainelSelecao = (() => {
       .filter((e) => !e.online || comAlerta(e) > 0)
       .sort((a, b) => Number(a.online) - Number(b.online) || comAlerta(b) - comAlerta(a));
 
-    const geometria =
-      tipo === "corredor"
-        ? `<div class="sel-linha"><span>Extensão</span><strong>${fmtDist(comprimentoPolilinhaM(reg.linha))}</strong></div>` +
-          (reg.raioM ? `<div class="sel-linha"><span>Alcance da linha</span><strong>${reg.raioM} m</strong></div>` : "")
-        : `<div class="sel-linha"><span>Área</span><strong>${fmtArea(areaPoligonoM2(reg.poligono))}</strong></div>`;
-
-    return `
-      <div class="sel-bloco">
-        <div class="sel-kpis">
-          <div class="sel-kpi"><b>${eqs.length}</b><span>Dispositivos</span></div>
-          <div class="sel-kpi"><b>${eqs.length - offline}</b><span>Online</span></div>
-          <div class="sel-kpi ${offline ? "is-alerta" : ""}"><b>${offline}</b><span>Offline</span></div>
-          <div class="sel-kpi ${alertas.length ? "is-alerta" : ""}"><b>${alertas.length}</b><span>Alertas</span></div>
-        </div>
-      </div>
-      <div class="sel-bloco">${geometria}</div>
-      <div class="sel-bloco">
-        <h5>Por categoria</h5>
-        ${
-          porCategoria.length
-            ? porCategoria
-                .map(
-                  ({ c, total, off }) => `
-          <div class="sel-cat">${ICONES_CATEGORIA[c.id] || ""}<span>${c.label}</span><b>${total}</b>${off ? `<span class="sel-cat-off">${off} offline</span>` : ""}</div>`
-                )
-                .join("")
-            : '<div class="sel-vazio">Nenhum dispositivo dentro desta região.</div>'
-        }
-      </div>
+    const topo = `<div class="sel-campos">
+      ${campo("Tipo", forte(tipo === "corredor" ? "Corredor" : "Subárea"))}
       ${
-        porSeveridade.length
-          ? `<div class="sel-bloco"><h5>Alertas por severidade</h5><div class="sel-sev">${porSeveridade
-              .map(([sev, n]) => `<span class="severidade-tag" data-sev="${sev}">${sev} ${n}</span>`)
-              .join("")}</div></div>`
-          : ""
+        tipo === "corredor"
+          ? campo("Extensão", forte(fmtDist(comprimentoPolilinhaM(reg.linha)) + (reg.raioM ? ` · alcance ${reg.raioM} m` : "")))
+          : campo("Área", forte(fmtArea(areaPoligonoM2(reg.poligono))))
       }
-      ${
-        atencao.length
-          ? `<div class="sel-bloco"><h5>Precisam de atenção <span class="sel-contagem">${atencao.length}</span></h5>
-        ${atencao
+      ${campo("Dispositivos", forte(eqs.length))}
+      ${campo("Alertas ativos", forte(alertas.length, alertas.length > 0))}
+    </div>`;
+
+    const status = `<div class="sel-campos">
+      ${campo("Online", forte(eqs.length - offline))}
+      ${campo("Offline", forte(offline, offline > 0))}
+      ${porCategoria
+        .map(({ c, total, off }) => campo(c.label, `${forte(total)}${off ? `<em class="sel-valor-alerta">${off} offline</em>` : ""}`))
+        .join("")}
+    </div>`;
+
+    const severidades = SEVERIDADES.map((sev) => [sev, alertas.filter((a) => a.severidade === sev).length]);
+    const alertasSecao = alertas.length
+      ? `<div class="sel-campos">${severidades.map(([sev, n]) => campo(sev, forte(n))).join("")}</div>`
+      : '<div class="sel-vazio">Nenhum alerta ativo.</div>';
+
+    const atencaoSecao = atencao.length
+      ? atencao
           .slice(0, 6)
           .map(
             (e) => `
@@ -119,10 +106,14 @@ const PainelSelecao = (() => {
             <span class="status-tag" data-status="${e.online ? "online" : "offline"}">${e.online ? "Online" : "Offline"}</span>
           </button>`
           )
-          .join("")}
-        ${atencao.length > 6 ? `<div class="sel-vazio">e mais ${atencao.length - 6}</div>` : ""}</div>`
-          : ""
-      }`;
+          .join("") + (atencao.length > 6 ? `<div class="sel-vazio">e mais ${atencao.length - 6}</div>` : "")
+      : '<div class="sel-vazio">Nenhum dispositivo com problema.</div>';
+
+    return `
+      <div class="sel-bloco">${topo}</div>
+      ${secaoMarkup("regiao-status", "Status dos dispositivos", eqs.length ? status : '<div class="sel-vazio">Nenhum dispositivo dentro desta região.</div>')}
+      ${secaoMarkup("regiao-alertas", "Alertas por severidade", alertasSecao)}
+      ${secaoMarkup("regiao-atencao", `Precisam de atenção${atencao.length ? ` (${atencao.length})` : ""}`, atencaoSecao)}`;
   }
 
   function descricaoDaSelecao(sel) {
@@ -174,7 +165,7 @@ const PainelSelecao = (() => {
     } else {
       abaAtiva = "geral";
     }
-    const acoes = desc.botoes + (acoesExtras ? acoesExtras(sel) : "");
+    const acoes = desc.botoes;
     el.innerHTML = `
       <header class="sel-head">
         <div class="sel-titulo"><strong>${desc.titulo}</strong><span>${desc.sub}</span></div>
@@ -211,8 +202,7 @@ const PainelSelecao = (() => {
     });
   }
 
-  // A cada tick do tempo real só os dados são refeitos, sem mexer nos botões (e num
-  // campo de renomear aberto pelo admin) nem na posição da rolagem.
+  // A cada tick do tempo real só os dados são refeitos, sem mexer nos botões nem na posição da rolagem.
   function atualizarDados({ forcar = false } = {}) {
     const sel = CockpitMap.getSelecao();
     const el = painelEl();
@@ -270,9 +260,6 @@ const PainelSelecao = (() => {
   });
 
   return {
-    definirAcoesExtras(fn) {
-      acoesExtras = fn;
-    },
     redesenharDados() {
       if (CockpitMap.getSelecao()) atualizarDados({ forcar: true });
     },

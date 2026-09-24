@@ -89,7 +89,7 @@ function montarSemaforos(linhas) {
     .map((c) => ({
       id: c.id,
       tipo: "semaforo",
-      nome: "Sem. " + escaparHtml(c.via || c.id),
+      nome: escaparHtml(c.via || c.id),
       lat: c.lat,
       lng: c.lng,
       ...regiaoDoPonto(c.lat, c.lng),

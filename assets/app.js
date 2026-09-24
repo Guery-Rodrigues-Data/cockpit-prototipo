@@ -257,6 +257,7 @@ function initGrid() {
     const id = el.getAttribute("gs-id");
     const inst = instances.find((i) => i.id === id);
     if (inst && inst.type === "mapa") CockpitMap.invalidateSize();
+    if (inst && inst.type === "regioes") renderWidgetBody(id); // recalcula linhas por página
     aplicarTamanhoResponsivo(id);
   });
 
@@ -303,7 +304,8 @@ function reconciliarRegioes() {
       if (!Array.isArray(f[campo])) return;
       f[campo] = f[campo].filter((id) => atuais.has(id));
       novas.forEach((id) => {
-        const cabe = campo === "regioes" || (campo === "subareas" ? id.startsWith("SA-") : id.startsWith("CR-"));
+        // pelo tipo real da região, não pelo prefixo do id (id oficial importado pode não ter "SA-")
+        const cabe = campo === "regioes" || (campo === "subareas" ? SUBAREAS : CORREDORES).some((r) => r.id === id);
         if (cabe && !f[campo].includes(id)) f[campo].push(id);
       });
     });
@@ -350,6 +352,7 @@ function adminAtivo() {
 }
 
 function carregarAdmin() {
+  document.body.classList.add("modo-admin"); // já na abertura: o menu do avatar depende dela e o admin.js carrega depois
   const css = document.createElement("link");
   css.rel = "stylesheet";
   css.href = "assets/admin.css";
@@ -670,6 +673,10 @@ function renderWidgetBody(id) {
   }
   if (inst.type === "regioes") {
     body.innerHTML = inst.config.modo === "totais" ? totaisRegioesMarkup(inst) : listaRegioesMarkup(inst);
+    if (inst.config.modo !== "totais") {
+      ajustarLarguraOrdem(body);
+      ajustarLinhasPorPagina(inst, body);
+    }
     return;
   }
 }
@@ -838,14 +845,99 @@ function linhaSelecionada(tipo, id) {
   return !!sel && sel.tipo === tipo && sel.id === id;
 }
 
+// Nome oficial vem como "SA06 - CABRAL": na lista fica só o nome (o código completo aparece no title).
+const nomeSemCodigo = (nome) => nome.replace(/^SA\s?\d+\s*-\s*/i, "");
+
+// Números de uma região para a lista: controladores (só controladores, igual ao mapa) e falhas
+// (controladores offline ou com alerta ativo).
+function numerosRegiao(tipo, id) {
+  const campo = tipo === "subarea" ? "subareaId" : "corredorId";
+  const ctrls = LiveState.getEquipamentos().filter((e) => e.tipo === "semaforo" && e[campo] === id);
+  const falhas = ctrls.filter((e) => !e.online || LiveState.alertasDoEquipamento(e.id).length > 0).length;
+  return { ctrls: ctrls.length, falhas };
+}
+
+// Controladores: ícone de semáforo + número na própria linha; o número tem largura fixa para o
+// ícone ficar na mesma coluna com 1, 2 ou 3 dígitos. Falha: só uma bolinha vermelha depois do
+// nome quando a área tem algum controlador com problema (a quantidade fica no title).
+const celulaControladores = (n) =>
+  `<span class="reg-total${n ? "" : " is-zero"}" title="${n} controlador${n === 1 ? "" : "es"}">${ICONES_CATEGORIA.semaforo}<b>${n}</b></span>`;
+const celulaFalhas = (n) =>
+  n ? `<i class="reg-falha-dot" title="${n} controlador${n === 1 ? "" : "es"} com falha" aria-label="${n} com falha"></i>` : "";
+
+// Ordenação escolhida num select ao lado da busca; cada opção já vem no sentido útil
+// (nome A→Z; números do maior para o menor — quem ordena por falha quer o pior no topo).
+const ORDENS_REGIOES = [
+  { id: "nome", label: "Nome (A–Z)" },
+  { id: "ctrls", label: "Mais controladores" },
+  { id: "falhas", label: "Mais falhas" },
+];
+function ordenarRegioes(lista, tipo, campo) {
+  const nums = new Map(lista.map((r) => [r.id, numerosRegiao(tipo, r.id)]));
+  const porNome = (a, b) => nomeSemCodigo(a.nome).localeCompare(nomeSemCodigo(b.nome), "pt-BR");
+  return [...lista].sort((a, b) => (campo === "nome" ? 0 : nums.get(b.id)[campo] - nums.get(a.id)[campo]) || porNome(a, b));
+}
+
+// Fallback de `field-sizing: content` (Safari/Firefox): mede o texto da opção escolhida e dá ao
+// select essa largura + a seta nativa.
+function ajustarLarguraOrdem(body) {
+  if (CSS.supports("field-sizing", "content")) return;
+  const sel = body.querySelector('[data-input="reg-ordem"]');
+  if (!sel) return;
+  const medida = document.createElement("span");
+  medida.style.cssText = `position:absolute;visibility:hidden;white-space:nowrap;font:${getComputedStyle(sel).font}`;
+  medida.textContent = sel.options[sel.selectedIndex].text;
+  document.body.appendChild(medida);
+  sel.style.width = `${medida.offsetWidth + 22}px`;
+  medida.remove();
+}
+
+function ordemRegioesMarkup(inst, campo) {
+  return `<label class="reg-ordem" title="Ordenar lista">
+    <span>Ordenar</span>
+    <select data-input="reg-ordem" data-id="${inst.id}">${ORDENS_REGIOES.map(
+      (o) => `<option value="${o.id}"${o.id === campo ? " selected" : ""}>${o.label}</option>`
+    ).join("")}</select>
+  </label>`;
+}
+
+// Paginação da lista de Regiões do tamanho do card: depois de desenhar, mede quantas linhas
+// cabem na área da lista e redesenha se o número mudou (roda de novo no resize do widget).
+function ajustarLinhasPorPagina(inst, body) {
+  const scroll = body.querySelector(".lista-scroll");
+  const linha = body.querySelector(".reg-lista tbody tr");
+  if (!scroll || !linha || !linha.offsetHeight) return;
+  const livre = scroll.clientHeight - 18; // 18 = margem da tabela + padding de baixo
+  const n = Math.max(3, Math.floor(livre / linha.offsetHeight));
+  if (n !== inst.linhasPorPagina) {
+    inst.linhasPorPagina = n;
+    renderWidgetBody(inst.id);
+  }
+}
+
+// O tempo real não refaz a lista (voltaria a rolagem ao topo, tiraria o foco da busca e
+// reordenaria as linhas debaixo do mouse): só troca os números de cada linha.
+function atualizarContagensRegioes() {
+  document.querySelectorAll(".reg-lista tr[data-alvo]").forEach((tr) => {
+    const { ctrls, falhas } = numerosRegiao(tr.dataset.tipo, tr.dataset.alvo);
+    const tdCtrl = tr.querySelector(".reg-contagem");
+    const falha = tr.querySelector(".reg-falha");
+    if (tdCtrl) tdCtrl.innerHTML = celulaControladores(ctrls);
+    if (falha) falha.innerHTML = celulaFalhas(falhas);
+  });
+}
+
 function listaRegioesMarkup(inst) {
   const ids = inst.config.filtros.regioes;
   const tab = inst.config.listaTab || "subareas";
   const fonte = tab === "subareas" ? SUBAREAS.filter((s) => ids.includes(s.id)) : CORREDORES.filter((c) => ids.includes(c.id));
   const busca = (inst.config.listaBusca || "").toLowerCase();
   const filtrados = busca ? fonte.filter((r) => r.nome.toLowerCase().includes(busca)) : fonte;
-  const { pagina, totalPaginas, itens } = paginar(filtrados, inst.config.listaPagina);
   const tipoAlvo = tab === "subareas" ? "subarea" : "corredor";
+  const salva = inst.config.listaOrdem && inst.config.listaOrdem.campo;
+  const ordem = ORDENS_REGIOES.some((o) => o.id === salva) ? salva : "nome";
+  const ordenados = ordenarRegioes(filtrados, tipoAlvo, ordem);
+  const { pagina, totalPaginas, itens } = paginar(ordenados, inst.config.listaPagina, inst.linhasPorPagina);
 
   return `
     <div class="lista-toolbar is-empilhada">
@@ -855,14 +947,20 @@ function listaRegioesMarkup(inst) {
         <button type="button" class="lista-tab ${tab === "corredores" ? "is-active" : ""}" data-action="lista-tab" data-id="${inst.id}" data-tab="corredores">Corredores</button>
       </div>
     </div>
+    <div class="reg-ordem-linha">${ordemRegioesMarkup(inst, ordem)}</div>
     <div class="lista-scroll is-recuada">
-      ${itens.length === 0 ? `<div class="lista-vazio">Nenhuma região encontrada.</div>` : `
-      <table class="lista-tabela">
+      ${filtrados.length === 0 ? `<div class="lista-vazio">Nenhuma região encontrada.</div>` : `
+      <table class="lista-tabela reg-lista">
         <tbody>
-          ${itens.map((r) => `
+          ${itens.map((r) => {
+            const cor = tipoAlvo === "subarea" ? CockpitMap.corDaArea(r) : "#2f6fed";
+            const { ctrls, falhas } = numerosRegiao(tipoAlvo, r.id);
+            return `
             <tr class="${linhaSelecionada(tipoAlvo, r.id) ? "is-selecionada" : ""}" data-action="lista-row" data-id="${inst.id}" data-tipo="${tipoAlvo}" data-alvo="${r.id}">
-              <td><strong>${r.nome}</strong><span class="id-mono">${r.id}</span></td>
-            </tr>`).join("")}
+              <td class="reg-nome" title="${r.nome}"><div class="reg-nome-in"><i class="reg-cor" style="background:${cor}"></i><span class="reg-texto">${nomeSemCodigo(r.nome)}</span><span class="reg-falha">${celulaFalhas(falhas)}</span></div></td>
+              <td class="reg-contagem">${celulaControladores(ctrls)}</td>
+            </tr>`;
+          }).join("")}
         </tbody>
       </table>`}
     </div>
@@ -881,10 +979,10 @@ function buscaMarkup(id) {
     </div>`;
 }
 
-function paginar(lista, pagina) {
-  const totalPaginas = Math.max(1, Math.ceil(lista.length / PAGE_SIZE));
+function paginar(lista, pagina, tamanho = PAGE_SIZE) {
+  const totalPaginas = Math.max(1, Math.ceil(lista.length / tamanho));
   const p = Math.min(Math.max(1, pagina || 1), totalPaginas);
-  const itens = lista.slice((p - 1) * PAGE_SIZE, p * PAGE_SIZE);
+  const itens = lista.slice((p - 1) * tamanho, p * tamanho);
   return { pagina: p, totalPaginas, itens };
 }
 
@@ -905,6 +1003,53 @@ function paginacaoMarkup(id, pagina, totalPaginas, total, comVerTudo) {
 
 /* ---------- Mapa: markup do header (dropdowns + busca) ---------- */
 
+// Camadas do mapa: o que aparece (subáreas, corredores, controladores). Botão "Camadas" que abre
+// uma lista de caixas de marcar, cada uma com uma amostra de como a camada aparece no mapa (serve
+// de legenda). Substituem os filtros "Subáreas N / Corredores N" (quais regiões), que com as 46
+// subáreas oficiais eram lista longa para uma pergunta que o operador não fazia.
+const CAMADAS_MAPA = [
+  { id: "subareas", label: "Subáreas", amostra: '<i class="camada-amostra is-area"></i>', total: () => SUBAREAS.length },
+  { id: "corredores", label: "Corredores", amostra: '<i class="camada-amostra is-linha"></i>', total: () => CORREDORES.length },
+  {
+    id: "controladores",
+    label: "Controladores",
+    amostra: `<i class="camada-amostra is-pin">${ICONE_PIN_CONTROLADOR}</i>`,
+    total: () => LiveState.getEquipamentos().filter((e) => e.tipo === "semaforo").length,
+  },
+];
+
+const camadasLigadas = (camadas = {}) => CAMADAS_MAPA.filter((c) => camadas[c.id] !== false).length;
+
+function camadasBtnInner(camadas) {
+  const n = camadasLigadas(camadas);
+  return `${ICONS.layers} Camadas${n < CAMADAS_MAPA.length ? ` <span>· ${n}/${CAMADAS_MAPA.length}</span>` : ""}`;
+}
+
+function camadasMarkup(camadas = {}) {
+  return `
+    <div class="map-filtro-btn-wrap" data-filtro-wrap="camadas">
+      <button type="button" class="map-filtro-btn${camadasLigadas(camadas) < CAMADAS_MAPA.length ? " is-active" : ""}" data-action="map-filtro-toggle" data-campo="camadas" data-map-camadas-btn>${camadasBtnInner(camadas)}</button>
+      <div class="filtros-panel" data-filtro-panel="camadas">${dropdownConteudo("camadas")}</div>
+    </div>`;
+}
+
+function camadasPainelMarkup() {
+  const camadas = CockpitMap.getFiltro().camadas || {};
+  return `
+    <div class="filtros-panel-title">Mostrar no mapa</div>
+    <div class="camadas-lista">
+      ${CAMADAS_MAPA.map(
+        (c) => `
+        <label class="camada-linha">
+          <input type="checkbox" data-input="map-camada" data-camada="${c.id}" ${camadas[c.id] !== false ? "checked" : ""}/>
+          ${c.amostra}
+          <span class="camada-nome">${c.label}</span>
+          <span class="camada-total">${c.total()}</span>
+        </label>`
+      ).join("")}
+    </div>`;
+}
+
 function mapaBodyMarkup(inst) {
   const c = CockpitMap.getContagens();
   // busca + filtros ficam sobre o mapa, como controles flutuantes (não uma
@@ -920,9 +1065,7 @@ function mapaBodyMarkup(inst) {
         <span class="map-toggle-trilho"><span class="map-toggle-bola"></span></span>
         Só problemas <span class="map-toggle-n" data-map-problemas>${c.problemas}</span>
       </button>
-      ${filtroBtnMarkup("subareas", "Subáreas", c.subareas)}
-      ${filtroBtnMarkup("corredores", "Corredores", c.corredores)}
-      ${filtroBtnMarkup("categorias", "Equipamentos", c.categorias)}
+      ${camadasMarkup(inst.config.filtros.camadas)}
     </div>
     <aside class="map-selecao" hidden></aside>
   `;
@@ -946,6 +1089,7 @@ function filtroBtnMarkup(campo, label, contagem) {
 }
 
 function dropdownConteudo(campo) {
+  if (campo === "camadas") return camadasPainelMarkup();
   if (campo === "subareas") {
     return dropdownChecklist("subareas", SUBAREAS, CockpitMap.getFiltro().subareas);
   }
@@ -999,6 +1143,11 @@ function atualizarCabecalhoMapa({ contagens, focoLabel, filtroSerializado }) {
   if (toggleProblemas) {
     toggleProblemas.setAttribute("aria-pressed", String(!!(filtroSerializado && filtroSerializado.soProblemas)));
     toggleProblemas.querySelector("[data-map-problemas]").textContent = contagens.problemas;
+  }
+  const btnCamadas = document.querySelector("[data-map-camadas-btn]");
+  if (btnCamadas && filtroSerializado && filtroSerializado.camadas) {
+    btnCamadas.innerHTML = camadasBtnInner(filtroSerializado.camadas);
+    btnCamadas.classList.toggle("is-active", camadasLigadas(filtroSerializado.camadas) < CAMADAS_MAPA.length);
   }
   ["subareas", "corredores", "categorias"].forEach((campo) => {
     const btn = document.querySelector(`.map-filtro-btn[data-campo="${campo}"]`);
@@ -1227,8 +1376,29 @@ document.addEventListener("click", (e) => {
     return;
   }
 
+  // Menu do avatar: interruptor do modo admin no topo; telas de exemplo e Limpar Cockpit só
+  // aparecem com ele ligado (fora dele a tela é sempre a mesma — pedido do Guery, 24/09).
   const userToggle = t.closest('[data-action="toggle-user-menu"]');
-  if (userToggle) { $("#userMenuDropdown").classList.toggle("is-open"); return; }
+  if (userToggle) {
+    $('[data-action="toggle-admin"]').setAttribute("aria-pressed", String(document.body.classList.contains("modo-admin")));
+    $("#userMenuDropdown").classList.toggle("is-open");
+    return;
+  }
+
+  // Liga/desliga o modo admin e recarrega: o admin.js só é carregado na abertura da página, e
+  // o ?admin da URL sai para não religar sozinho.
+  if (t.closest('[data-action="toggle-admin"]')) {
+    const ligar = !document.body.classList.contains("modo-admin");
+    try {
+      if (ligar) localStorage.setItem(ADMIN_KEY, "1");
+      else localStorage.removeItem(ADMIN_KEY);
+    } catch (e) {}
+    const url = new URL(location.href);
+    url.searchParams.delete("admin");
+    if (ligar) url.searchParams.set("admin", "1"); // garante mesmo sem localStorage
+    location.replace(url.toString());
+    return;
+  }
 
   const presetBtn = t.closest('[data-action="load-preset"]');
   if (presetBtn) {
@@ -1431,6 +1601,15 @@ document.addEventListener("input", (e) => {
 
 document.addEventListener("change", (e) => {
   const t = e.target;
+  if (t.matches('[data-input="reg-ordem"]')) {
+    const inst = instances.find((i) => i.id === t.dataset.id);
+    inst.config.listaOrdem = { campo: t.value };
+    inst.config.listaPagina = 1;
+    saveLayout();
+    renderWidgetBody(inst.id);
+    return;
+  }
+  if (t.matches('[data-input="map-camada"]')) CockpitMap.setCamada(t.dataset.camada, t.checked);
   if (t.matches('[data-input="map-check"]')) {
     const campo = t.dataset.campo, alvo = t.dataset.alvo;
     if (campo === "categorias") CockpitMap.toggleCategoria(alvo);
@@ -1477,5 +1656,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     instances.forEach((inst) => {
       if (inst.type !== "mapa" && inst.config.modo === "totais") renderWidgetBody(inst.id);
     });
+    atualizarContagensRegioes();
   });
 });
