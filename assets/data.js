@@ -23,6 +23,11 @@ const ICONES_CATEGORIA = {
   pluviometro: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 16a5 5 0 0 1-1-9.9A6 6 0 0 1 18 8a4 4 0 0 1-1 8H8Z"/><path d="M9 19v1M12 19v2M15 19v1"/></svg>',
 };
 
+// Pino do controlador no mapa (base: Documents/Icones/controlador-icone.svg). Corpo branco com borda
+// cinza, no mesmo tom dos clusters neutros; a ponta de baixo (12, 27.5) é o ponto do controlador.
+const ICONE_PIN_CONTROLADOR =
+  '<svg width="24" height="28" viewBox="0 0 24 28" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 0.5C21.4853 0.5 23.5 2.51472 23.5 5V18C23.5 20.4853 21.4853 22.5 19 22.5H15.0801L13.4004 26.5273C13.1394 27.1529 12.5827 27.5 12 27.5C11.4173 27.5 10.8606 27.1529 10.5996 26.5273L8.91992 22.5H5C2.51472 22.5 0.5 20.4853 0.5 18V5C0.5 2.51472 2.51472 0.5 5 0.5H19Z" fill="#fff" stroke="#a9afb9" stroke-width="1.5"/><rect x="4.5" y="4.5" width="15" height="14" rx="1.5" fill="#fff" stroke="#16151A" stroke-width="1.3"/><circle cx="16.5" cy="11.5" r="1" fill="#16151A"/><rect x="13" y="4.5" width="1.2" height="14" fill="#16151A"/></svg>';
+
 const SEVERIDADES = ["Crítico", "Alto", "Médio", "Baixo"];
 const SEVERIDADE_COR = { "Crítico": "var(--red)", "Alto": "var(--amber)", "Médio": "#2f6fed", "Baixo": "var(--ink-faint)" };
 
@@ -45,14 +50,14 @@ const CORREDORES = [];
    posição do equipamento em relação às regiões cadastradas. Equipamento fora de qualquer região
    fica "solto", caso real e válido. */
 const EQUIPAMENTOS = [
-  { id: "SEM-1001", tipo: "semaforo", nome: "Sem. Sete de Setembro x XV de Novembro", lat: -25.4297, lng: -49.2711, online: true },
-  { id: "SEM-1002", tipo: "semaforo", nome: "Sem. Marechal Deodoro x Cândido de Abreu", lat: -25.4258, lng: -49.2699, online: true },
-  { id: "SEM-1003", tipo: "semaforo", nome: "Sem. Av. do Batel x Padre Anchieta", lat: -25.4392, lng: -49.2825, online: false },
-  { id: "SEM-1004", tipo: "semaforo", nome: "Sem. Água Verde x Brasílio Itiberê", lat: -25.4498, lng: -49.2780, online: true },
-  { id: "SEM-1005", tipo: "semaforo", nome: "Sem. Comendador Franco x Linha Verde", lat: -25.4380, lng: -49.2825, online: true },
-  { id: "SEM-1006", tipo: "semaforo", nome: "Sem. Sete de Setembro x Brigadeiro Franco", lat: -25.4325, lng: -49.2650, online: true },
-  { id: "SEM-1007", tipo: "semaforo", nome: "Sem. Rui Barbosa x Visc. de Nácar", lat: -25.4470, lng: -49.2750, online: false },
-  { id: "SEM-1008", tipo: "semaforo", nome: "Sem. XV de Novembro x Ébano Pereira", lat: -25.4290, lng: -49.2735, online: true },
+  { id: "SEM-1001", tipo: "semaforo", nome: "Sete de Setembro x XV de Novembro", lat: -25.4297, lng: -49.2711, online: true },
+  { id: "SEM-1002", tipo: "semaforo", nome: "Marechal Deodoro x Cândido de Abreu", lat: -25.4258, lng: -49.2699, online: true },
+  { id: "SEM-1003", tipo: "semaforo", nome: "Av. do Batel x Padre Anchieta", lat: -25.4392, lng: -49.2825, online: false },
+  { id: "SEM-1004", tipo: "semaforo", nome: "Água Verde x Brasílio Itiberê", lat: -25.4498, lng: -49.2780, online: true },
+  { id: "SEM-1005", tipo: "semaforo", nome: "Comendador Franco x Linha Verde", lat: -25.4380, lng: -49.2825, online: true },
+  { id: "SEM-1006", tipo: "semaforo", nome: "Sete de Setembro x Brigadeiro Franco", lat: -25.4325, lng: -49.2650, online: true },
+  { id: "SEM-1007", tipo: "semaforo", nome: "Rui Barbosa x Visc. de Nácar", lat: -25.4470, lng: -49.2750, online: false },
+  { id: "SEM-1008", tipo: "semaforo", nome: "XV de Novembro x Ébano Pereira", lat: -25.4290, lng: -49.2735, online: true },
 
   { id: "CAM-2001", tipo: "camera", nome: "Câm. Praça Tiradentes", lat: -25.4285, lng: -49.2705, online: true },
   { id: "CAM-2002", tipo: "camera", nome: "Câm. Av. do Batel 1200", lat: -25.4405, lng: -49.2810, online: true },

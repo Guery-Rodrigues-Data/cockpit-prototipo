@@ -106,7 +106,9 @@ const pontosValidos = (lista, minimo) =>
 async function buscarRegioesCadastradas() {
   const [linhasCorredores, linhasAreas] = await Promise.all([
     supabaseRequisitar(`${TABELA_CORREDORES}?select=id,nome,linha,raio_m&order=nome`),
-    supabaseRequisitar(`${TABELA_AREAS}?select=id,nome,poligono&order=nome`),
+    // select=* e não a lista de colunas: a coluna `cor` é opcional (regioes.sql) e pedir por nome
+    // quebraria a leitura num banco que ainda não a tem
+    supabaseRequisitar(`${TABELA_AREAS}?select=*&order=nome`),
   ]);
   return {
     corredores: linhasCorredores
@@ -114,7 +116,7 @@ async function buscarRegioesCadastradas() {
       .map((r) => ({ id: r.id, nome: escaparHtml(r.nome), linha: r.linha, raioM: r.raio_m || RAIO_CORREDOR_PADRAO_M, cadastrado: true })),
     areas: linhasAreas
       .filter((r) => pontosValidos(r.poligono, 3))
-      .map((r) => ({ id: r.id, nome: escaparHtml(r.nome), poligono: r.poligono, cadastrado: true })),
+      .map((r) => ({ id: r.id, nome: escaparHtml(r.nome), poligono: r.poligono, cor: /^#[0-9a-f]{6}$/i.test(r.cor || "") ? r.cor : null, cadastrado: true })),
   };
 }
 

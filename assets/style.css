@@ -27,6 +27,9 @@
   --purple: #7c4fd6;
   --purple-tint: #f1ecfb;
 
+  --btn-primary: #3a3a3a;
+  --btn-primary-hover: #1f1f1f;
+
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
@@ -147,12 +150,13 @@ a { color: inherit; }
 }
 .cockpit-toolbar .btn-primary { padding: 8px 14px; font-size: 13px; }
 
+/* botão principal cinza-escuro, igual ao sistema (print do modal "Editar dispositivo") */
 .btn-primary {
-  background: var(--red); color: #fff; border: none; border-radius: var(--radius-md);
+  background: var(--btn-primary); color: #fff; border: none; border-radius: var(--radius-md);
   padding: 11px 16px; font-size: 13.5px; font-weight: 600; cursor: pointer; text-decoration: none;
   display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: background 0.15s ease;
 }
-.btn-primary:hover { background: var(--red-dark); }
+.btn-primary:hover { background: var(--btn-primary-hover); }
 .btn-primary svg { width: 16px; height: 16px; }
 .btn-secondary {
   background: var(--surface); color: var(--ink); border: 1px solid var(--border-strong);
@@ -649,6 +653,18 @@ a { color: inherit; }
 .map-eq-pin svg { width: 13px; height: 13px; }
 .map-eq-pin.is-selecionado { transform: scale(1.2); box-shadow: 0 0 0 4px rgba(224, 52, 43, 0.3), var(--shadow-md); }
 
+/* Pino do controlador (ícone da pasta Icones) + bolinha de estado no canto superior direito */
+.map-ctrl-pin { position: relative; width: 24px; height: 28px; filter: drop-shadow(0 2px 3px rgba(22, 26, 32, 0.3)); transform-origin: 50% 100%; transition: transform 0.12s ease; }
+.map-ctrl-pin svg { display: block; }
+.map-ctrl-pin:hover { transform: scale(1.15); }
+.map-ctrl-pin::after {
+  content: ""; position: absolute; top: -4px; right: -4px; width: 10px; height: 10px; border-radius: 50%;
+  border: 2px solid #fff; display: none;
+}
+.map-ctrl-pin[data-estado="offline"]::after { display: block; background: var(--red); }
+.map-ctrl-pin[data-estado="alerta"]::after { display: block; background: var(--amber); }
+.map-ctrl-pin.is-selecionado { transform: scale(1.3); filter: drop-shadow(0 0 0 #fff) drop-shadow(0 0 6px rgba(224, 52, 43, 0.75)); }
+
 /* Cluster recuado por padrão; âmbar com alertas; vermelho quando agrupa algum offline. */
 .map-cluster {
   width: 32px; height: 32px; border-radius: 50%; background: #fff; color: var(--ink-muted); border: 2px solid var(--border-strong);
@@ -679,8 +695,11 @@ a { color: inherit; }
 .map-toggle[aria-pressed="true"] .map-toggle-n { background: var(--red); color: #fff; }
 
 /* ---------- painel lateral de seleção (clique num dispositivo/região do Mapa) ---------- */
+/* Largura acompanha o mapa (30% dele, entre 340 e 420px): em monitor grande o painel ganha
+   espaço pro diagrama e valores longos; em notebook fica em 340px pra não tapar metade do mapa.
+   Se mudar aqui, mudar também larguraDiagramaPainel() em painel-controlador.js. */
 .map-selecao {
-  position: absolute; top: 58px; right: 10px; bottom: 28px; width: 340px; max-width: calc(100% - 20px); z-index: 900; /* bottom deixa a atribuição do mapa visível */
+  position: absolute; top: 58px; right: 10px; bottom: 28px; width: clamp(340px, 30%, 420px); max-width: calc(100% - 20px); z-index: 900; /* bottom deixa a atribuição do mapa visível */
   display: flex; flex-direction: column; overflow: hidden;
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-lg);
   font-family: var(--font-body);
@@ -688,7 +707,7 @@ a { color: inherit; }
 .map-selecao[hidden] { display: none; }
 .map-selecao.is-open { animation: selecaoEntra 0.22s ease-out; }
 @keyframes selecaoEntra { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
-.sel-head { display: flex; align-items: center; gap: 10px; padding: 14px 10px 14px 16px; background: var(--ink); color: #fff; }
+.sel-head { display: flex; align-items: center; gap: 10px; padding: 16px 14px 16px 20px; background: var(--ink); color: #fff; }
 .sel-titulo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .sel-titulo strong { font-size: 16px; line-height: 1.25; color: #fff; }
 .sel-titulo span { font-family: var(--font-mono); font-size: 11px; color: rgba(255, 255, 255, 0.72); }
@@ -698,15 +717,16 @@ a { color: inherit; }
 .sel-head .widget-icon-btn:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
 .sel-corpo { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
 .sel-footer {
-  flex-shrink: 0; padding: 8px 14px; border-top: 1px solid var(--border); background: var(--surface-sunken);
+  flex-shrink: 0; padding: 10px 20px; border-top: 1px solid var(--border); background: var(--surface-sunken);
   font-size: 11px; color: var(--ink-faint); display: flex; flex-direction: column; gap: 4px;
 }
 .sel-footer strong, .sel-footer em { color: var(--ink-muted); font-weight: 600; font-style: normal; }
 .sel-footer-linha { display: flex; align-items: center; justify-content: space-between; gap: 5px; }
 .sel-footer-linha strong { font-family: var(--font-mono); font-weight: 500; }
-.sel-dados { padding: 14px 14px 6px; }
-.sel-bloco { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.sel-dados { padding: 18px 20px 10px; }
+.sel-bloco { padding: 12px 0; border-bottom: 1px solid var(--border); }
 .sel-bloco:last-child { border-bottom: none; }
+.sel-dados > .sel-bloco:first-child { padding-top: 2px; } /* o padding do .sel-dados já dá o respiro do topo */
 .sel-bloco h5 {
   margin: 0 0 8px; display: flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 700;
   letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-faint);
@@ -774,7 +794,7 @@ a { color: inherit; }
 .sel-item > span:first-child { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .sel-item strong { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sel-acoes {
-  position: sticky; bottom: 0; margin-top: auto; padding: 12px 14px; display: flex; flex-wrap: wrap; gap: 8px;
+  position: sticky; bottom: 0; margin-top: auto; padding: 12px 20px; display: flex; flex-wrap: wrap; gap: 8px;
   background: var(--surface); border-top: 1px solid var(--border);
 }
 .sel-acoes .btn-secondary, .sel-acoes .btn-primary { flex: 1 1 calc(50% - 4px); padding: 8px 10px; font-size: 12px; }
@@ -940,7 +960,7 @@ a { color: inherit; }
 
 /* ---------- abas do painel lateral (controlador): Geral, Status, Comandos, Grupos ---------- */
 .sel-selo { flex-shrink: 0; }
-.sel-abas { display: flex; padding: 0 6px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.sel-abas { display: flex; padding: 0 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .sel-aba {
   flex: 1; padding: 10px 4px; border: none; border-bottom: 2px solid transparent; background: none;
   font: inherit; font-size: 12px; font-weight: 600; color: var(--ink-faint); cursor: pointer;
@@ -1108,20 +1128,33 @@ a { color: inherit; }
 .plano-horas span:last-child { transform: translateX(-100%); }
 
 /* modal "Planos do controlador" (aberto pelo "Ver todos os planos" da aba Plano) — reaproveita o
-   .config-modal do app, mais largo e sem Salvar. Uma coluna só: chips (qual) → semana (quando) → detalhe (como). */
-.plano-modal { width: 900px; max-height: 90vh; }
-.plano-modal-titulo { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.plano-modal-titulo span { font-family: var(--font-mono); font-size: 10px; color: var(--ink-faint); }
-.plano-modal-corpo { gap: 22px; padding: 18px 22px 20px; }
+   .config-modal do app, mais largo e sem Salvar. Uma coluna só, na ordem de leitura de quem programa
+   semáforo: plano → tempos → diagrama → coordenação → quando roda → outros planos. */
+/* Padrão visual do sistema (print "Editar dispositivo"): Roboto, título grande sem linha embaixo,
+   seção com título escuro em escrita normal + divisória, cantos de 4–8px, botões compactos à
+   direita. Os valores continuam como texto (não caixa de input): aqui é só visualização. */
+.plano-modal { width: 800px; max-height: 90vh; font-family: "Roboto", var(--font-body); border-radius: 8px; }
+.plano-modal .config-modal-header { align-items: center; padding: 22px 24px 16px; border-bottom: 1px solid var(--border); }
+.plano-modal-titulo { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.plano-modal .plano-modal-titulo strong { font-family: inherit; font-size: 20px; font-weight: 700; color: var(--ink); }
+/* primeira linha do modal: lista de planos + selo de situação, sem rótulo */
+.plano-id { display: flex; align-items: center; gap: 12px; }
+.plano-modal-titulo span { font-size: 12.5px; color: var(--ink-faint); }
+.plano-nav-select {
+  width: 260px; max-width: 100%; height: 34px; padding: 0 8px; border: 1px solid var(--border-strong); border-radius: 4px;
+  background: var(--surface); font: inherit; font-size: 13.5px; font-weight: 500; color: var(--ink); cursor: pointer;
+}
+.plano-nav-select:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+.plano-modal-corpo { gap: 20px; padding: 16px 24px 16px; }
 .plano-modal-h {
-  margin: 0 0 10px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-faint);
+  margin: 0 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border);
+  font-size: 12px; font-weight: 700; color: var(--ink);
 }
 
-.plano-chips-linha { display: flex; align-items: center; gap: 14px; }
-.plano-chips-linha .plano-modal-h { margin: 0; }
 .plano-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.plano-outros-h { margin-top: 20px; }
 .plano-chip {
-  position: relative; min-width: 34px; height: 30px; padding: 0 8px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  position: relative; min-width: 34px; height: 30px; padding: 0 8px; border: 1px solid var(--border); border-radius: 4px;
   background: var(--surface); font: inherit; font-size: 12.5px; font-weight: 600; color: var(--ink-muted); cursor: pointer;
   font-variant-numeric: tabular-nums;
 }
@@ -1140,32 +1173,55 @@ a { color: inherit; }
 .plano-semana .plano-bloco { font-size: 10.5px; }
 .plano-semana-linha.is-eixo .plano-horas { margin-top: 0; }
 
-.plano-detalhe { display: flex; flex-direction: column; gap: 14px; padding-top: 18px; border-top: 1px solid var(--border); }
-.plano-detalhe-topo { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.plano-detalhe-nome { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.plano-detalhe-nome .plano-nome { font-size: 15px; font-weight: 700; color: var(--ink); }
-.plano-detalhe-nome span { font-size: 12px; color: var(--ink-muted); white-space: pre-wrap; }
-.plano-config { display: grid; grid-template-columns: 1fr 220px; gap: 28px; align-items: start; }
+.plano-detalhe { display: flex; flex-direction: column; gap: 20px; }
 .plano-config-campos { grid-template-columns: repeat(3, 1fr); gap: 12px 24px; }
-.plano-estagios { width: 100%; border-collapse: collapse; font-size: 12.5px; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
-.plano-estagios th { padding: 6px 12px; text-align: left; font-size: 10.5px; font-weight: 600; color: var(--ink-faint); background: var(--surface-sunken); border-bottom: 1px solid var(--border); }
-.plano-estagios td { padding: 6px 12px; color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
-.plano-estagios td + td, .plano-estagios th + th { text-align: right; }
-.plano-estagios tbody tr + tr td { border-top: 1px solid var(--border); }
+/* no modal: rótulo claro e leve, valor escuro e maior, para o olho cair no valor */
+.plano-modal .plano-config-campos .sel-campo { gap: 3px; }
+.plano-modal .plano-config-campos .sel-campo > span:first-child { font-size: 11px; font-weight: 500; color: var(--ink-faint); }
+.plano-modal .plano-config-campos .sel-campo strong { font-size: 14px; font-weight: 600; color: var(--ink); }
+.plano-modal .plano-config-campos .sel-campo em { font-size: 14px; color: var(--ink-faint); }
+/* "Quando roda" no modal: uma linha por grupo de dias, dias numa coluna e horários na outra */
+.plano-quando-lista { display: grid; grid-template-columns: max-content 1fr; gap: 4px 20px; align-items: baseline; margin-bottom: 12px; }
+.plano-quando-lista strong { font-size: 14px; font-weight: 600; color: var(--ink); }
+.plano-quando-fora { margin: 0 0 12px; font-size: 13px; color: var(--ink-faint); }
+.plano-modal .plano-quando-lista span { font-size: 13px; font-weight: 500; color: var(--ink-muted); }
+.plano-estagios { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; margin-top: 12px; }
+.plano-estagio {
+  display: flex; flex-direction: column; gap: 2px; padding: 6px 10px;
+  border: 1px solid var(--border); border-radius: 4px; background: var(--surface-sunken);
+}
+.plano-estagio span { font-size: 11px; font-weight: 500; color: var(--ink-faint); }
+.plano-estagio strong { font-size: 14px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
 
-.plano-modal-acoes { align-items: center; justify-content: space-between; }
-.plano-modal-acoes .btn-secondary { flex: 0 0 auto; padding-inline: 20px; }
-.plano-modal-rodape { font-size: 11px; color: var(--ink-faint); }
+.plano-modal-acoes { align-items: center; justify-content: flex-end; padding: 14px 24px 20px; border-top: none; }
+.plano-modal-acoes .btn-secondary { flex: 0 0 auto; padding: 8px 20px; border-radius: 4px; font-weight: 500; }
 @media (max-width: 760px) {
-  .plano-config { grid-template-columns: 1fr; }
   .plano-config-campos { grid-template-columns: 1fr 1fr; }
 }
 
-/* aba Plano: o plano em curso é o título da seção (mesmo tamanho dos títulos de seção da Geral) */
-.plano-cabecalho { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 4px 0 14px; }
-.plano-cabecalho-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-/* modo de operação: dado que a operação disse que usa — fica colado no nome do plano */
-.plano-cabecalho-txt span { font-size: 12.5px; font-weight: 600; color: var(--ink-muted); }
-.plano-cabecalho h4 { margin: 0; font-size: 14.5px; font-weight: 700; color: var(--ink); line-height: 1.3; }
-.plano-cabecalho .status-tag { flex-shrink: 0; }
+/* aba Plano: mesmas colunas da Geral, com mais ar entre as linhas */
+.plano-resumo-campos { row-gap: 16px; }
+.plano-ver-todos { padding-top: 22px; }
+.plano-nome-vivo { display: inline-flex; align-items: baseline; gap: 7px; }
+.plano-dot { flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; background: var(--green); transform: translateY(-1px); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 20%, transparent); }
+.plano-dot.is-previsto { background: var(--amber); box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 20%, transparent); }
 .plano-diag-leitura { margin-top: 10px; }
+
+/* Lista de Subáreas/Corredores: uma linha por região — cor (a mesma do mapa) · nome … controladores.
+   Paginada com quantas linhas couberem na altura do card (ajustarLinhasPorPagina em app.js). */
+.reg-lista { table-layout: fixed; }
+.lista-scroll.is-recuada .reg-lista tbody td { padding: 7px 10px; }
+.lista-scroll.is-recuada .reg-lista tbody tr td { border-radius: 0; }
+.lista-scroll.is-recuada .reg-lista tbody tr td:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+.lista-scroll.is-recuada .reg-lista tbody tr td:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.reg-lista td.reg-nome { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.reg-cor { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 9px; vertical-align: 0; }
+.reg-texto { font-weight: 600; color: var(--ink); }
+.reg-lista td.reg-contagem { width: 56px; text-align: right; white-space: nowrap; }
+.reg-total { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--ink-muted); font-variant-numeric: tabular-nums; vertical-align: middle; }
+.reg-total svg { width: 13px; height: 13px; color: var(--ink-faint); }
+.reg-total.is-zero { color: var(--ink-faint); font-weight: 500; }
+
+/* painel da área: número que pede atenção (offline, alertas) em vermelho */
+.sel-campo .sel-valor-alerta { color: var(--red); }
+.sel-campo em.sel-valor-alerta { font-size: 11px; font-weight: 600; font-style: normal; }

@@ -99,7 +99,13 @@ const CockpitMap = (() => {
     if (map) setTimeout(() => map.invalidateSize(), 60);
   }
 
+  // Por enquanto o mapa mostra só controladores (pedido do Guery, 24/09). As outras categorias
+  // continuam nos dados e nos widgets; para voltar, basta tirar esta checagem e reexibir o filtro
+  // "Equipamentos" em app.js.
+  const noMapa = (eq) => eq.tipo === "semaforo";
+
   function equipamentoVisivel(eq) {
+    if (!noMapa(eq)) return false;
     if (!filtro.categorias.has(eq.tipo)) return false;
     if (filtro.soProblemas && !temProblema(eq)) return false;
     if (filtro.statusConexao === "online" && !eq.online) return false;
@@ -117,11 +123,21 @@ const CockpitMap = (() => {
   // Problema = offline ou com alerta ativo. É o que o operador precisa achar no meio de ~1000.
   const temProblema = (eq) => !eq.online || LiveState.alertasDoEquipamento(eq.id).length > 0;
 
-  // Hierarquia visual: o que está bem vira um ponto pequeno e discreto; o que tem problema
-  // ganha o pin com o ícone da categoria (vermelho = offline, âmbar = online mas com alerta).
+  // Controlador: sempre o pino próprio; o estado vai numa bolinha no canto (vermelho = offline,
+  // âmbar = alerta, sem bolinha = ok), pra problema não sumir no meio de ~1000 pinos iguais.
+  // Demais categorias (fora do mapa por ora): ponto discreto se ok, pin com ícone se problema.
   function pinEquipamento(eq) {
     const alertaAtivo = LiveState.alertasDoEquipamento(eq.id).length > 0;
     const sel = !!selecao && selecao.tipo === "equipamento" && selecao.id === eq.id;
+    if (eq.tipo === "semaforo") {
+      const estado = !eq.online ? "offline" : alertaAtivo ? "alerta" : "ok";
+      return L.divIcon({
+        html: `<div class="map-ctrl-pin${sel ? " is-selecionado" : ""}" data-estado="${estado}">${ICONE_PIN_CONTROLADOR}</div>`,
+        className: "",
+        iconSize: [24, 28],
+        iconAnchor: [12, 27],
+      });
+    }
     if (eq.online && !alertaAtivo) {
       return L.divIcon({
         html: `<div class="map-dot${sel ? " is-selecionado" : ""}"></div>`,
@@ -205,6 +221,19 @@ const CockpitMap = (() => {
     ].join("#");
   }
 
+  // Cada área com a sua cor, fixa pelo id (não muda ao recarregar nem quando outra área é
+  // cadastrada/excluída). Fora da paleta de propósito: vermelho e âmbar (offline/alerta nos pinos),
+  // verde (lê como "ok") e o azul dos corredores.
+  const CORES_AREA = ["#7c4fd6", "#0e9384", "#d6458f", "#4f5bd5", "#0891b2", "#8a6d3b", "#9b59b6", "#5f7d1f"];
+  // Recebe a área (não só o id): a cor oficial do cadastro, quando houver, vence a automática.
+  // Exportada para a lista de Subáreas usar a mesma cor do mapa.
+  function corDaArea(area) {
+    if (area.cor) return area.cor;
+    let h = 0;
+    for (const ch of area.id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    return CORES_AREA[h % CORES_AREA.length];
+  }
+
   function desenharRegioes() {
     layerRegioes.clearLayers();
     const focoRegiaoId = foco && foco.tipo === "regiao" ? foco.id : null;
@@ -213,18 +242,19 @@ const CockpitMap = (() => {
       if (!filtro.subareas.has(s.id)) return;
       if (foco && foco.tipo === "regiao" && !(foco.regiaoTipo === "subarea" && foco.id === s.id)) return;
       const destacada = focoRegiaoId === s.id || (!!selecao && selecao.tipo === "subarea" && selecao.id === s.id);
-      // fillOpacity 0 continua clicável por dentro; o preenchimento só entra no hover ou selecionada
+      // preenchimento leve da cor da área; hover e seleção só reforçam a mesma cor
+      const cor = corDaArea(s);
       const poligono = L.polygon(s.poligono, {
-        color: destacada ? "var(--red)" : "#8b94a3",
-        weight: destacada ? 2.5 : 1.5,
-        fillColor: "#e0342b",
-        fillOpacity: destacada ? 0.16 : 0,
-        dashArray: destacada ? null : "4 4",
+        color: cor,
+        weight: destacada ? 3 : 1.5,
+        opacity: destacada ? 1 : 0.8,
+        fillColor: cor,
+        fillOpacity: destacada ? 0.26 : 0.12,
       });
       poligono
         .bindTooltip(s.nome, { permanent: false, direction: "center", className: "map-region-tooltip" })
-        .on("mouseover", () => !destacada && poligono.setStyle({ color: "#5b6472", fillOpacity: 0.08 }))
-        .on("mouseout", () => !destacada && poligono.setStyle({ color: "#8b94a3", fillOpacity: 0 }))
+        .on("mouseover", () => !destacada && poligono.setStyle({ weight: 2.5, fillOpacity: 0.2 }))
+        .on("mouseout", () => !destacada && poligono.setStyle({ weight: 1.5, fillOpacity: 0.12 }))
         .on("click", (ev) => {
           L.DomEvent.stopPropagation(ev);
           selecionarRegiao("subarea", s.id);
@@ -383,7 +413,7 @@ const CockpitMap = (() => {
       subareas: { sel: filtro.subareas.size, total: SUBAREAS.length },
       corredores: { sel: filtro.corredores.size, total: CORREDORES.length },
       categorias: { sel: filtro.categorias.size, total: CATEGORIAS_EQUIPAMENTO.length },
-      problemas: LiveState.getEquipamentos().filter(temProblema).length,
+      problemas: LiveState.getEquipamentos().filter((eq) => noMapa(eq) && temProblema(eq)).length,
     };
   }
 
@@ -453,8 +483,8 @@ const CockpitMap = (() => {
     foco = null;
     if (payload.tipos) filtro.categorias = new Set(payload.tipos);
     if (payload.regioes) {
-      filtro.subareas = new Set(payload.regioes.filter((id) => id.startsWith("SA-")));
-      filtro.corredores = new Set(payload.regioes.filter((id) => id.startsWith("CR-")));
+      filtro.subareas = new Set(payload.regioes.filter((id) => SUBAREAS.some((s) => s.id === id)));
+      filtro.corredores = new Set(payload.regioes.filter((id) => CORREDORES.some((c) => c.id === id)));
     }
     filtro.statusConexao = payload.statusConexao || "todos";
     filtro.statusAlerta = payload.statusAlerta || "todos";
@@ -537,5 +567,6 @@ const CockpitMap = (() => {
     focarRegiao,
     limparFoco,
     buscar,
+    corDaArea,
   };
 })();

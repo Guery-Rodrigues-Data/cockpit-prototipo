@@ -23,6 +23,10 @@ create table if not exists cockpit_areas (
   atualizado timestamptz not null default now()
 );
 
+-- cor: cor oficial da subárea no sistema (ex.: "#00A9D8"). Opcional; sem ela o mapa usa uma
+--   cor automática pelo id.
+alter table cockpit_areas add column if not exists cor text;
+
 drop trigger if exists trg_cockpit_corredores_atualizado on cockpit_corredores;
 create trigger trg_cockpit_corredores_atualizado before update on cockpit_corredores
   for each row execute function set_atualizado();

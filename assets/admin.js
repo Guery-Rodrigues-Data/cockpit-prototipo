@@ -250,7 +250,7 @@
         melhor = e;
       }
     });
-    return melhor ? desescapar(melhor.nome).replace(/^Sem\.\s*/, "") : null;
+    return melhor ? desescapar(melhor.nome) : null;
   }
 
   // Rua no ponto pelo OpenStreetMap (Nominatim, consulta pública gratuita); se não responder,

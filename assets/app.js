@@ -257,6 +257,7 @@ function initGrid() {
     const id = el.getAttribute("gs-id");
     const inst = instances.find((i) => i.id === id);
     if (inst && inst.type === "mapa") CockpitMap.invalidateSize();
+    if (inst && inst.type === "regioes") renderWidgetBody(id); // recalcula linhas por página
     aplicarTamanhoResponsivo(id);
   });
 
@@ -303,7 +304,8 @@ function reconciliarRegioes() {
       if (!Array.isArray(f[campo])) return;
       f[campo] = f[campo].filter((id) => atuais.has(id));
       novas.forEach((id) => {
-        const cabe = campo === "regioes" || (campo === "subareas" ? id.startsWith("SA-") : id.startsWith("CR-"));
+        // pelo tipo real da região, não pelo prefixo do id (id oficial importado pode não ter "SA-")
+        const cabe = campo === "regioes" || (campo === "subareas" ? SUBAREAS : CORREDORES).some((r) => r.id === id);
         if (cabe && !f[campo].includes(id)) f[campo].push(id);
       });
     });
@@ -670,6 +672,7 @@ function renderWidgetBody(id) {
   }
   if (inst.type === "regioes") {
     body.innerHTML = inst.config.modo === "totais" ? totaisRegioesMarkup(inst) : listaRegioesMarkup(inst);
+    if (inst.config.modo !== "totais") ajustarLinhasPorPagina(inst, body);
     return;
   }
 }
@@ -838,14 +841,47 @@ function linhaSelecionada(tipo, id) {
   return !!sel && sel.tipo === tipo && sel.id === id;
 }
 
+// Nome oficial vem como "SA06 - CABRAL": na lista fica só o nome (o código completo aparece no title).
+const nomeSemCodigo = (nome) => nome.replace(/^SA\s?\d+\s*-\s*/i, "");
+
+// Lado direito da linha: ícone de semáforo + controladores da região (só controladores, igual ao
+// mapa; o ícone não pode prometer semáforo e contar câmera). Por extenso só no title.
+function contagemRegiaoMarkup(tipo, id) {
+  const campo = tipo === "subarea" ? "subareaId" : "corredorId";
+  const n = LiveState.getEquipamentos().filter((e) => e.tipo === "semaforo" && e[campo] === id).length;
+  return `<span class="reg-total${n ? "" : " is-zero"}" title="${n} controlador${n === 1 ? "" : "es"}">${ICONES_CATEGORIA.semaforo}${n}</span>`;
+}
+
+// Paginação da lista de Regiões do tamanho do card: depois de desenhar, mede quantas linhas
+// cabem na área da lista e redesenha se o número mudou (roda de novo no resize do widget).
+function ajustarLinhasPorPagina(inst, body) {
+  const scroll = body.querySelector(".lista-scroll");
+  const linha = body.querySelector(".reg-lista tbody tr");
+  if (!scroll || !linha || !linha.offsetHeight) return;
+  const n = Math.max(3, Math.floor((scroll.clientHeight - 18) / linha.offsetHeight)); // 18 = margem da tabela + padding de baixo
+  if (n !== inst.linhasPorPagina) {
+    inst.linhasPorPagina = n;
+    renderWidgetBody(inst.id);
+  }
+}
+
+// O tempo real não refaz a lista (voltaria a rolagem ao topo e tiraria o foco da busca):
+// só troca a contagem de cada linha.
+function atualizarContagensRegioes() {
+  document.querySelectorAll(".reg-lista tr[data-alvo]").forEach((tr) => {
+    const td = tr.querySelector(".reg-contagem");
+    if (td) td.innerHTML = contagemRegiaoMarkup(tr.dataset.tipo, tr.dataset.alvo);
+  });
+}
+
 function listaRegioesMarkup(inst) {
   const ids = inst.config.filtros.regioes;
   const tab = inst.config.listaTab || "subareas";
   const fonte = tab === "subareas" ? SUBAREAS.filter((s) => ids.includes(s.id)) : CORREDORES.filter((c) => ids.includes(c.id));
   const busca = (inst.config.listaBusca || "").toLowerCase();
   const filtrados = busca ? fonte.filter((r) => r.nome.toLowerCase().includes(busca)) : fonte;
-  const { pagina, totalPaginas, itens } = paginar(filtrados, inst.config.listaPagina);
   const tipoAlvo = tab === "subareas" ? "subarea" : "corredor";
+  const { pagina, totalPaginas, itens } = paginar(filtrados, inst.config.listaPagina, inst.linhasPorPagina);
 
   return `
     <div class="lista-toolbar is-empilhada">
@@ -856,13 +892,17 @@ function listaRegioesMarkup(inst) {
       </div>
     </div>
     <div class="lista-scroll is-recuada">
-      ${itens.length === 0 ? `<div class="lista-vazio">Nenhuma região encontrada.</div>` : `
-      <table class="lista-tabela">
+      ${filtrados.length === 0 ? `<div class="lista-vazio">Nenhuma região encontrada.</div>` : `
+      <table class="lista-tabela reg-lista">
         <tbody>
-          ${itens.map((r) => `
+          ${itens.map((r) => {
+            const cor = tipoAlvo === "subarea" ? CockpitMap.corDaArea(r) : "#2f6fed";
+            return `
             <tr class="${linhaSelecionada(tipoAlvo, r.id) ? "is-selecionada" : ""}" data-action="lista-row" data-id="${inst.id}" data-tipo="${tipoAlvo}" data-alvo="${r.id}">
-              <td><strong>${r.nome}</strong><span class="id-mono">${r.id}</span></td>
-            </tr>`).join("")}
+              <td class="reg-nome" title="${r.nome}"><i class="reg-cor" style="background:${cor}"></i><span class="reg-texto">${nomeSemCodigo(r.nome)}</span></td>
+              <td class="reg-contagem">${contagemRegiaoMarkup(tipoAlvo, r.id)}</td>
+            </tr>`;
+          }).join("")}
         </tbody>
       </table>`}
     </div>
@@ -881,10 +921,10 @@ function buscaMarkup(id) {
     </div>`;
 }
 
-function paginar(lista, pagina) {
-  const totalPaginas = Math.max(1, Math.ceil(lista.length / PAGE_SIZE));
+function paginar(lista, pagina, tamanho = PAGE_SIZE) {
+  const totalPaginas = Math.max(1, Math.ceil(lista.length / tamanho));
   const p = Math.min(Math.max(1, pagina || 1), totalPaginas);
-  const itens = lista.slice((p - 1) * PAGE_SIZE, p * PAGE_SIZE);
+  const itens = lista.slice((p - 1) * tamanho, p * tamanho);
   return { pagina: p, totalPaginas, itens };
 }
 
@@ -922,7 +962,8 @@ function mapaBodyMarkup(inst) {
       </button>
       ${filtroBtnMarkup("subareas", "Subáreas", c.subareas)}
       ${filtroBtnMarkup("corredores", "Corredores", c.corredores)}
-      ${filtroBtnMarkup("categorias", "Equipamentos", c.categorias)}
+      ${"" /* filtro "Equipamentos" escondido enquanto o mapa mostra só controladores (ver noMapa em map.js):
+      filtroBtnMarkup("categorias", "Equipamentos", c.categorias) */}
     </div>
     <aside class="map-selecao" hidden></aside>
   `;
@@ -1477,5 +1518,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     instances.forEach((inst) => {
       if (inst.type !== "mapa" && inst.config.modo === "totais") renderWidgetBody(inst.id);
     });
+    atualizarContagensRegioes();
   });
 });
