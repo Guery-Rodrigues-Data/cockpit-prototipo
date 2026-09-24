@@ -352,6 +352,7 @@ function adminAtivo() {
 }
 
 function carregarAdmin() {
+  document.body.classList.add("modo-admin"); // já na abertura: o menu do avatar depende dela e o admin.js carrega depois
   const css = document.createElement("link");
   css.rel = "stylesheet";
   css.href = "assets/admin.css";
@@ -1375,8 +1376,29 @@ document.addEventListener("click", (e) => {
     return;
   }
 
+  // Menu do avatar: interruptor do modo admin no topo; telas de exemplo e Limpar Cockpit só
+  // aparecem com ele ligado (fora dele a tela é sempre a mesma — pedido do Guery, 24/09).
   const userToggle = t.closest('[data-action="toggle-user-menu"]');
-  if (userToggle) { $("#userMenuDropdown").classList.toggle("is-open"); return; }
+  if (userToggle) {
+    $('[data-action="toggle-admin"]').setAttribute("aria-pressed", String(document.body.classList.contains("modo-admin")));
+    $("#userMenuDropdown").classList.toggle("is-open");
+    return;
+  }
+
+  // Liga/desliga o modo admin e recarrega: o admin.js só é carregado na abertura da página, e
+  // o ?admin da URL sai para não religar sozinho.
+  if (t.closest('[data-action="toggle-admin"]')) {
+    const ligar = !document.body.classList.contains("modo-admin");
+    try {
+      if (ligar) localStorage.setItem(ADMIN_KEY, "1");
+      else localStorage.removeItem(ADMIN_KEY);
+    } catch (e) {}
+    const url = new URL(location.href);
+    url.searchParams.delete("admin");
+    if (ligar) url.searchParams.set("admin", "1"); // garante mesmo sem localStorage
+    location.replace(url.toString());
+    return;
+  }
 
   const presetBtn = t.closest('[data-action="load-preset"]');
   if (presetBtn) {

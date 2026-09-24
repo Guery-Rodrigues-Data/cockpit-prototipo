@@ -50,7 +50,9 @@
     <span class="admin-dock-tag">Admin</span>
     <button type="button" data-adm="novo-corredor">${ICONS.plus} Corredor</button>
     <button type="button" data-adm="novo-area">${ICONS.plus} Área</button>
-    <button type="button" data-adm="lista">Cadastrados <span class="admin-dock-count" id="admContagem"></span></button>`;
+    <button type="button" data-adm="lista">Cadastrados <span class="admin-dock-count" id="admContagem"></span></button>
+    <span class="admin-dock-sep"></span>
+    <button type="button" data-adm="telas">Telas</button>`;
 
   const barra = document.createElement("div");
   barra.className = "admin-drawbar";
@@ -60,13 +62,41 @@
   painel.className = "admin-lista";
   painel.hidden = true;
 
-  document.body.append(dock, barra, painel);
+  // Telas de exemplo (PRESETS em app.js) + Limpar Cockpit: ferramenta de teste, por isso moram
+  // no dock do admin e não no menu do avatar. Os cliques são tratados em app.js
+  // (data-action load-preset / clear-layout), como antes.
+  const painelTelas = document.createElement("div");
+  painelTelas.className = "admin-lista admin-telas";
+  painelTelas.hidden = true;
+  painelTelas.innerHTML = `
+    <h4>Telas de exemplo</h4>
+    ${PRESETS.map(
+      (p) => `
+      <button type="button" class="admin-tela" data-action="load-preset" data-preset="${p.id}">
+        <strong>${p.nome}</strong><span>${p.descricao}</span>
+      </button>`
+    ).join("")}
+    <div class="admin-telas-rodape">
+      <button type="button" class="btn-text" data-action="clear-layout" title="Remove todos os widgets desta tela, volta ao primeiro acesso">Limpar Cockpit</button>
+    </div>`;
+  let telasAbertas = false;
+
+  document.body.append(dock, barra, painel, painelTelas);
   document.body.classList.add("modo-admin"); // admin.css reserva o espaço do dock embaixo do canvas
 
   function atualizarDock() {
     const { corredores, areas } = cadastrados();
     document.getElementById("admContagem").textContent = corredores.length + areas.length;
     dock.querySelector('[data-adm="lista"]').classList.toggle("is-on", listaAberta);
+    dock.querySelector('[data-adm="telas"]').classList.toggle("is-on", telasAbertas);
+  }
+
+  // Telas e Cadastrados abrem no mesmo canto: um fecha o outro.
+  function alternarTelas(abrir) {
+    telasAbertas = abrir === undefined ? !telasAbertas : abrir;
+    painelTelas.hidden = !telasAbertas;
+    if (telasAbertas && listaAberta) alternarLista(false);
+    atualizarDock();
   }
 
   /* ---------- desenho no mapa ---------- */
@@ -378,6 +408,7 @@
   function alternarLista(abrir) {
     listaAberta = abrir === undefined ? !listaAberta : abrir;
     painel.hidden = !listaAberta;
+    if (listaAberta && telasAbertas) alternarTelas(false);
     if (listaAberta) renderLista();
     atualizarDock();
   }
@@ -465,6 +496,7 @@
   /* ---------- eventos ---------- */
 
   document.addEventListener("click", (e) => {
+    if (e.target.closest(".admin-telas [data-action]")) return alternarTelas(false);
     const alvo = e.target.closest("[data-adm]");
     if (!alvo) return;
     const linha = alvo.closest(".admin-row");
@@ -472,6 +504,7 @@
       case "novo-corredor": return iniciarDesenho("corredor");
       case "novo-area": return iniciarDesenho("area");
       case "lista": return alternarLista();
+      case "telas": return alternarTelas();
       case "desfazer": return desfazerPonto();
       case "concluir": return concluirDesenho();
       case "cancelar": return encerrarDesenho();

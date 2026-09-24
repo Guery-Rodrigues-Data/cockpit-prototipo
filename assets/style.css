@@ -106,28 +106,10 @@ a { color: inherit; }
   box-shadow: var(--shadow-md); padding: 6px; z-index: 950;
 }
 .user-menu-dropdown.is-open { display: block; }
-.user-menu-label {
-  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
-  color: var(--ink-faint); padding: 6px 10px 4px;
-}
-.user-menu-preset {
-  display: block; width: 100%; text-align: left; border: none; background: none;
-  cursor: pointer; padding: 8px 10px; border-radius: 6px;
-}
-.user-menu-preset:hover { background: var(--surface-sunken); }
-.user-menu-preset strong {
-  display: block; font-family: var(--font-display); font-size: 13px; font-weight: 600; color: var(--ink);
-}
-.user-menu-preset span {
-  display: block; font-size: 11.5px; color: var(--ink-muted); line-height: 1.4; margin-top: 2px;
-}
-.user-menu-sep { height: 1px; background: var(--border); margin: 6px 4px; }
 .btn-text {
   background: none; border: none; color: var(--red); font-size: 12.5px; font-weight: 600;
   cursor: pointer; padding: 4px 0; display: block; width: 100%; text-align: left; border-radius: 6px;
 }
-.user-menu-dropdown .btn-text { padding: 8px 10px; }
-.user-menu-dropdown .btn-text:hover { background: var(--surface-sunken); text-decoration: none; }
 
 /* ---------- Toolbar da página (título + adicionar widget) ---------- */
 
@@ -946,6 +928,11 @@ a { color: inherit; }
 /* linha da lista cuja região/dispositivo está aberto no painel lateral do Mapa */
 .lista-tabela tr.is-selecionada td { background: var(--red-tint); }
 .lista-tabela tr.is-selecionada td:first-child { box-shadow: inset 3px 0 0 var(--red); }
+
+/* menu do avatar: interruptor do modo admin + aviso; o resto do menu só com admin ligado */
+.user-menu-admin { padding: 6px 6px 4px; }
+.user-menu-admin-toggle { width: 100%; box-shadow: none; }
+.user-menu-admin-aviso { margin: 8px 2px 2px; font-size: 11.5px; line-height: 1.45; color: var(--ink-muted); }
 
 /* Título da tela como caminho: [casa vermelha] » Cockpit */
 .cockpit-breadcrumb { display: flex; align-items: center; gap: 6px; font-family: "Roboto", var(--font-body); }
