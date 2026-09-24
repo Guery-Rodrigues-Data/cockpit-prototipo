@@ -137,7 +137,7 @@ const PainelControlador = (() => {
   // operacional e modo de operação têm seção própria logo abaixo. "Última comunicação" fica
   // fixa no rodapé do painel (ver rodapeMarkup), visível em qualquer aba, não só na Geral.
   function identificacaoMarkup(eq) {
-    return `<div class="sel-campos">
+    return `<div class="sel-campos is-esq-larga">
       ${campo("Tipo", "<strong>Controlador</strong>")}
       ${campo("Modelo", `<strong>${DETALHES_EXEMPLO.modelo}</strong>`)}
       ${campo("Fabricante", `<strong>${DETALHES_EXEMPLO.fabricante}</strong>`)}
@@ -164,7 +164,7 @@ const PainelControlador = (() => {
     const agora = new Date();
     const desvioS = (eq.id.charCodeAt(eq.id.length - 1) % 12) - 6;
     const equipamento = new Date(agora.getTime() + desvioS * 1000);
-    return `<div class="sel-campos">
+    return `<div class="sel-campos is-esq-larga">
       ${campo("Porta do equipamento", `<strong>${OPERACAO_EXEMPLO.portaEquipamento}</strong>`)}
       ${campo("Programação", `<strong>${OPERACAO_EXEMPLO.programacao}</strong>`)}
       ${campo("Horário do equipamento", `<strong>${fmtHora(equipamento)}</strong>`)}
@@ -178,10 +178,11 @@ const PainelControlador = (() => {
   function modoOperacaoMarkup(eq) {
     const sub = eq.subareaId ? nomeSubarea(eq.subareaId) : null;
     const cor = eq.corredorId ? nomeCorredor(eq.corredorId) : null;
-    return `<div class="sel-campos">
+    // Sem o código ("SA06 - "), como na lista de Subáreas; o nome oficial completo fica no title.
+    return `<div class="sel-campos is-esq-larga">
       ${campo("Modo", `<strong>${PLANOS_EXEMPLO[faixaAgora()[2]].modo}</strong>`, true)}
+      ${campo("Subárea do sistema", `<strong class="sel-uma-linha" title="${sub || "Fora de subárea"}">${sub ? nomeSemCodigo(sub) : "Fora de subárea"}</strong>`)}
       ${campo("Subárea lógica", `<strong>${OPERACAO_EXEMPLO.subareaLogica}</strong>`)}
-      ${campo("Subárea do sistema", `<strong>${sub || "Fora de subárea"}</strong>`)}
       ${campo("Seleção", `<strong>${OPERACAO_EXEMPLO.selecao}</strong>`)}
       ${campo("Corredor", `<strong>${cor || "Fora de corredor"}</strong>`)}
       ${campo("Status", `<strong>${OPERACAO_EXEMPLO.statusModo}</strong>`)}
@@ -200,7 +201,7 @@ const PainelControlador = (() => {
   function enderecoMarkup(eq) {
     const e = cacheEndereco.get(eq.id) || { estado: "carregando" };
     const buscando = e.estado === "carregando" ? "<em>Buscando...</em>" : null;
-    return `<div class="sel-campos">
+    return `<div class="sel-campos is-esq-larga">
       ${campo("Logradouro", buscando || valor(e.rua), true)}
       ${campo("Bairro", buscando || valor(e.bairro))}
       ${campo("Coordenadas", `<strong class="sel-mono">${eq.lat.toFixed(5)}, ${eq.lng.toFixed(5)}</strong>`)}
@@ -853,7 +854,8 @@ const PainelControlador = (() => {
     const opcoes = Object.values(PLANOS_EXEMPLO)
       .map(
         (q) =>
-          `<option value="${q.num}"${q.num === p.num ? " selected" : ""}>Plano ${q.num} · ${q.desc}${q.num === emCurso.num ? " (em curso)" : quandoRoda(q.num).length ? "" : " (fora da tabela)"}</option>`
+          // sem "Plano" (o rótulo antes do select já diz) e sem "(em curso)" (o selo ao lado já diz)
+          `<option value="${q.num}"${q.num === p.num ? " selected" : ""}>${q.num} · ${q.desc}${quandoRoda(q.num).length ? "" : " (fora da tabela)"}</option>`
       )
       .join("");
     const semana = ORDEM_SEMANA.map(
@@ -877,7 +879,7 @@ const PainelControlador = (() => {
                  HIPÓTESE: validar com engenheiro de tráfego do cliente. -->
             <!-- sem título nem rótulos: a lista já diz qual plano é e o selo diz se está rodando -->
             <div class="plano-id">
-              <select class="plano-nav-select" data-plano-select aria-label="Escolher plano">${opcoes}</select>
+              <label class="plano-nav"><span>Plano</span><select class="plano-nav-select" data-plano-select aria-label="Escolher plano">${opcoes}</select></label>
               ${seloPlano(ehEmCurso, eq.online)}
             </div>
             <div>
@@ -932,6 +934,21 @@ const PainelControlador = (() => {
           <button type="button" class="btn-secondary" data-plano-fechar>Fechar</button>
         </div>
       </div>`;
+    ajustarLarguraPlano();
+  }
+
+  // Fallback de `field-sizing: content` (Safari/Firefox): a lista de plano fica da largura da
+  // opção escolhida, como o "Ordenar" da lista de Subáreas.
+  function ajustarLarguraPlano() {
+    if (CSS.supports("field-sizing", "content")) return;
+    const sel = modalEl().querySelector("[data-plano-select]");
+    if (!sel) return;
+    const medida = document.createElement("span");
+    medida.style.cssText = `position:absolute;visibility:hidden;white-space:nowrap;font:${getComputedStyle(sel).font}`;
+    medida.textContent = sel.options[sel.selectedIndex].text;
+    document.body.appendChild(medida);
+    sel.style.width = `${medida.offsetWidth + 24}px`;
+    medida.remove();
   }
 
   // Relógio da aba Plano e do modal: move cursor, "agora" e campos ao vivo sem refazer o HTML.

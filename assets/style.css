@@ -665,19 +665,12 @@ a { color: inherit; }
 .map-ctrl-pin[data-estado="alerta"]::after { display: block; background: var(--amber); }
 .map-ctrl-pin.is-selecionado { transform: scale(1.3); filter: drop-shadow(0 0 0 #fff) drop-shadow(0 0 6px rgba(224, 52, 43, 0.75)); }
 
-/* Cluster recuado por padrão; âmbar com alertas; vermelho quando agrupa algum offline. */
+/* Agrupamento: só controladores saudáveis, sempre neutro (os com problema ficam soltos no mapa). */
 .map-cluster {
   width: 32px; height: 32px; border-radius: 50%; background: #fff; color: var(--ink-muted); border: 2px solid var(--border-strong);
   display: flex; align-items: center; justify-content: center; position: relative;
   font-family: var(--font-body); font-size: 11.5px; font-weight: 700; box-shadow: var(--shadow-sm);
 }
-.map-cluster.is-alerta { background: var(--amber-tint); color: #8a5a06; border-color: var(--amber); }
-.map-cluster.is-offline { background: var(--red); color: #fff; border-color: #fff; box-shadow: 0 2px 10px rgba(224, 52, 43, 0.4); }
-.map-cluster-prob {
-  position: absolute; top: -7px; right: -7px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px;
-  background: var(--amber); color: #fff; border: 1.5px solid #fff; font-size: 10px; line-height: 14px; text-align: center;
-}
-.map-cluster.is-offline .map-cluster-prob { background: #fff; color: var(--red); border-color: var(--red); }
 
 /* Só problemas: liga/desliga no topo do mapa, com a contagem viva de quantos existem. */
 /* Camadas do mapa: lista de caixas de marcar, cada uma com amostra de como aparece no mapa */
@@ -1153,13 +1146,17 @@ a { color: inherit; }
 .plano-modal-titulo { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .plano-modal .plano-modal-titulo strong { font-family: inherit; font-size: 20px; font-weight: 700; color: var(--ink); }
 /* primeira linha do modal: lista de planos + selo de situação, sem rótulo */
-.plano-id { display: flex; align-items: center; gap: 12px; }
+.plano-id { display: flex; align-items: center; gap: 20px; }
 .plano-modal-titulo span { font-size: 12.5px; color: var(--ink-faint); }
+/* mesmo estilo do "Ordenar" da lista de Subáreas: rótulo claro + valor em negrito, sem caixa, com a
+   largura da opção escolhida (field-sizing; ajustarLarguraPlano() nos navegadores sem suporte) */
+.plano-nav { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.plano-nav span { font-size: 11px; font-weight: 500; color: var(--ink-faint); }
 .plano-nav-select {
-  width: 260px; max-width: 100%; height: 34px; padding: 0 8px; border: 1px solid var(--border-strong); border-radius: 4px;
-  background: var(--surface); font: inherit; font-size: 13.5px; font-weight: 500; color: var(--ink); cursor: pointer;
+  field-sizing: content; max-width: 100%; padding: 2px 0; border: none; background: none;
+  font: inherit; font-size: 14px; font-weight: 600; color: var(--ink); cursor: pointer; /* igual aos valores dos campos */
 }
-.plano-nav-select:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+.plano-nav-select:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 2px; }
 .plano-modal-corpo { gap: 20px; padding: 16px 24px 16px; }
 .plano-modal-h {
   margin: 0 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border);
@@ -1217,6 +1214,10 @@ a { color: inherit; }
 /* aba Plano: mesmas colunas da Geral, com mais ar entre as linhas */
 .plano-resumo-campos { row-gap: 16px; }
 .plano-ver-todos { padding-top: 22px; }
+/* aba Geral: todos os blocos com a mesma proporção (esquerda mais larga, para nome de subárea e
+   logradouro caberem numa linha), assim a segunda coluna fica alinhada de cima a baixo */
+.sel-campos.is-esq-larga { grid-template-columns: 1.6fr 1fr; }
+.sel-campo .sel-uma-linha { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .plano-nome-vivo { display: inline-flex; align-items: baseline; gap: 7px; }
 .plano-dot { flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; background: var(--green); transform: translateY(-1px); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 20%, transparent); }
 .plano-dot.is-previsto { background: var(--amber); box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 20%, transparent); }
@@ -1229,13 +1230,30 @@ a { color: inherit; }
 .lista-scroll.is-recuada .reg-lista tbody tr td { border-radius: 0; }
 .lista-scroll.is-recuada .reg-lista tbody tr td:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
 .lista-scroll.is-recuada .reg-lista tbody tr td:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
-.reg-lista td.reg-nome { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* nome encolhe com "…" e a bolinha de falha depois dele nunca é cortada */
+.reg-nome-in { display: flex; align-items: center; min-width: 0; white-space: nowrap; }
+.reg-nome-in .reg-texto { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.reg-nome-in .reg-cor, .reg-nome-in .reg-falha { flex-shrink: 0; display: inline-flex; }
 .reg-cor { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 9px; vertical-align: 0; }
 .reg-texto { font-weight: 600; color: var(--ink); }
-.reg-lista td.reg-contagem { width: 56px; text-align: right; white-space: nowrap; }
+.reg-lista .reg-contagem { width: 60px; text-align: right; white-space: nowrap; }
 .reg-total { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--ink-muted); font-variant-numeric: tabular-nums; vertical-align: middle; }
+.reg-total b { display: inline-block; min-width: 3ch; text-align: right; font-weight: inherit; } /* ícone sempre na mesma coluna */
 .reg-total svg { width: 13px; height: 13px; color: var(--ink-faint); }
 .reg-total.is-zero { color: var(--ink-faint); font-weight: 500; }
+.reg-falha-dot { display: inline-block; width: 7px; height: 7px; margin-left: 7px; border-radius: 50%; background: var(--red); box-shadow: 0 0 0 2px var(--red-tint); vertical-align: 1px; }
+/* "Ordenar": embaixo das abas, antes do primeiro item, alinhado à direita (mesmo recuo da lista) */
+.reg-ordem-linha { display: flex; justify-content: flex-end; padding: 8px 30px 0; } /* 30 = recuo da lista (20) + padding da célula (10): alinha com os números */
+.reg-ordem { display: flex; align-items: center; gap: 4px; }
+.reg-ordem span { font-size: 11px; color: var(--ink-faint); }
+/* largura = só a opção escolhida (não a mais longa), para "Ordenar" ficar sempre colado no valor;
+   field-sizing no Chrome/Edge, ajustarLarguraOrdem() em app.js nos demais */
+.reg-ordem select {
+  field-sizing: content; border: none; background: none; padding: 2px 0; font: inherit; font-size: 11.5px; font-weight: 600;
+  color: var(--ink); cursor: pointer;
+}
+.reg-ordem select:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 2px; }
+
 
 /* painel da área: número que pede atenção (offline, alertas) em vermelho */
 .sel-campo .sel-valor-alerta { color: var(--red); }

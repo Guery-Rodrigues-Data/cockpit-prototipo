@@ -672,7 +672,10 @@ function renderWidgetBody(id) {
   }
   if (inst.type === "regioes") {
     body.innerHTML = inst.config.modo === "totais" ? totaisRegioesMarkup(inst) : listaRegioesMarkup(inst);
-    if (inst.config.modo !== "totais") ajustarLinhasPorPagina(inst, body);
+    if (inst.config.modo !== "totais") {
+      ajustarLarguraOrdem(body);
+      ajustarLinhasPorPagina(inst, body);
+    }
     return;
   }
 }
@@ -844,12 +847,57 @@ function linhaSelecionada(tipo, id) {
 // Nome oficial vem como "SA06 - CABRAL": na lista fica só o nome (o código completo aparece no title).
 const nomeSemCodigo = (nome) => nome.replace(/^SA\s?\d+\s*-\s*/i, "");
 
-// Lado direito da linha: ícone de semáforo + controladores da região (só controladores, igual ao
-// mapa; o ícone não pode prometer semáforo e contar câmera). Por extenso só no title.
-function contagemRegiaoMarkup(tipo, id) {
+// Números de uma região para a lista: controladores (só controladores, igual ao mapa) e falhas
+// (controladores offline ou com alerta ativo).
+function numerosRegiao(tipo, id) {
   const campo = tipo === "subarea" ? "subareaId" : "corredorId";
-  const n = LiveState.getEquipamentos().filter((e) => e.tipo === "semaforo" && e[campo] === id).length;
-  return `<span class="reg-total${n ? "" : " is-zero"}" title="${n} controlador${n === 1 ? "" : "es"}">${ICONES_CATEGORIA.semaforo}${n}</span>`;
+  const ctrls = LiveState.getEquipamentos().filter((e) => e.tipo === "semaforo" && e[campo] === id);
+  const falhas = ctrls.filter((e) => !e.online || LiveState.alertasDoEquipamento(e.id).length > 0).length;
+  return { ctrls: ctrls.length, falhas };
+}
+
+// Controladores: ícone de semáforo + número na própria linha; o número tem largura fixa para o
+// ícone ficar na mesma coluna com 1, 2 ou 3 dígitos. Falha: só uma bolinha vermelha depois do
+// nome quando a área tem algum controlador com problema (a quantidade fica no title).
+const celulaControladores = (n) =>
+  `<span class="reg-total${n ? "" : " is-zero"}" title="${n} controlador${n === 1 ? "" : "es"}">${ICONES_CATEGORIA.semaforo}<b>${n}</b></span>`;
+const celulaFalhas = (n) =>
+  n ? `<i class="reg-falha-dot" title="${n} controlador${n === 1 ? "" : "es"} com falha" aria-label="${n} com falha"></i>` : "";
+
+// Ordenação escolhida num select ao lado da busca; cada opção já vem no sentido útil
+// (nome A→Z; números do maior para o menor — quem ordena por falha quer o pior no topo).
+const ORDENS_REGIOES = [
+  { id: "nome", label: "Nome (A–Z)" },
+  { id: "ctrls", label: "Mais controladores" },
+  { id: "falhas", label: "Mais falhas" },
+];
+function ordenarRegioes(lista, tipo, campo) {
+  const nums = new Map(lista.map((r) => [r.id, numerosRegiao(tipo, r.id)]));
+  const porNome = (a, b) => nomeSemCodigo(a.nome).localeCompare(nomeSemCodigo(b.nome), "pt-BR");
+  return [...lista].sort((a, b) => (campo === "nome" ? 0 : nums.get(b.id)[campo] - nums.get(a.id)[campo]) || porNome(a, b));
+}
+
+// Fallback de `field-sizing: content` (Safari/Firefox): mede o texto da opção escolhida e dá ao
+// select essa largura + a seta nativa.
+function ajustarLarguraOrdem(body) {
+  if (CSS.supports("field-sizing", "content")) return;
+  const sel = body.querySelector('[data-input="reg-ordem"]');
+  if (!sel) return;
+  const medida = document.createElement("span");
+  medida.style.cssText = `position:absolute;visibility:hidden;white-space:nowrap;font:${getComputedStyle(sel).font}`;
+  medida.textContent = sel.options[sel.selectedIndex].text;
+  document.body.appendChild(medida);
+  sel.style.width = `${medida.offsetWidth + 22}px`;
+  medida.remove();
+}
+
+function ordemRegioesMarkup(inst, campo) {
+  return `<label class="reg-ordem" title="Ordenar lista">
+    <span>Ordenar</span>
+    <select data-input="reg-ordem" data-id="${inst.id}">${ORDENS_REGIOES.map(
+      (o) => `<option value="${o.id}"${o.id === campo ? " selected" : ""}>${o.label}</option>`
+    ).join("")}</select>
+  </label>`;
 }
 
 // Paginação da lista de Regiões do tamanho do card: depois de desenhar, mede quantas linhas
@@ -858,19 +906,23 @@ function ajustarLinhasPorPagina(inst, body) {
   const scroll = body.querySelector(".lista-scroll");
   const linha = body.querySelector(".reg-lista tbody tr");
   if (!scroll || !linha || !linha.offsetHeight) return;
-  const n = Math.max(3, Math.floor((scroll.clientHeight - 18) / linha.offsetHeight)); // 18 = margem da tabela + padding de baixo
+  const livre = scroll.clientHeight - 18; // 18 = margem da tabela + padding de baixo
+  const n = Math.max(3, Math.floor(livre / linha.offsetHeight));
   if (n !== inst.linhasPorPagina) {
     inst.linhasPorPagina = n;
     renderWidgetBody(inst.id);
   }
 }
 
-// O tempo real não refaz a lista (voltaria a rolagem ao topo e tiraria o foco da busca):
-// só troca a contagem de cada linha.
+// O tempo real não refaz a lista (voltaria a rolagem ao topo, tiraria o foco da busca e
+// reordenaria as linhas debaixo do mouse): só troca os números de cada linha.
 function atualizarContagensRegioes() {
   document.querySelectorAll(".reg-lista tr[data-alvo]").forEach((tr) => {
-    const td = tr.querySelector(".reg-contagem");
-    if (td) td.innerHTML = contagemRegiaoMarkup(tr.dataset.tipo, tr.dataset.alvo);
+    const { ctrls, falhas } = numerosRegiao(tr.dataset.tipo, tr.dataset.alvo);
+    const tdCtrl = tr.querySelector(".reg-contagem");
+    const falha = tr.querySelector(".reg-falha");
+    if (tdCtrl) tdCtrl.innerHTML = celulaControladores(ctrls);
+    if (falha) falha.innerHTML = celulaFalhas(falhas);
   });
 }
 
@@ -881,7 +933,10 @@ function listaRegioesMarkup(inst) {
   const busca = (inst.config.listaBusca || "").toLowerCase();
   const filtrados = busca ? fonte.filter((r) => r.nome.toLowerCase().includes(busca)) : fonte;
   const tipoAlvo = tab === "subareas" ? "subarea" : "corredor";
-  const { pagina, totalPaginas, itens } = paginar(filtrados, inst.config.listaPagina, inst.linhasPorPagina);
+  const salva = inst.config.listaOrdem && inst.config.listaOrdem.campo;
+  const ordem = ORDENS_REGIOES.some((o) => o.id === salva) ? salva : "nome";
+  const ordenados = ordenarRegioes(filtrados, tipoAlvo, ordem);
+  const { pagina, totalPaginas, itens } = paginar(ordenados, inst.config.listaPagina, inst.linhasPorPagina);
 
   return `
     <div class="lista-toolbar is-empilhada">
@@ -891,16 +946,18 @@ function listaRegioesMarkup(inst) {
         <button type="button" class="lista-tab ${tab === "corredores" ? "is-active" : ""}" data-action="lista-tab" data-id="${inst.id}" data-tab="corredores">Corredores</button>
       </div>
     </div>
+    <div class="reg-ordem-linha">${ordemRegioesMarkup(inst, ordem)}</div>
     <div class="lista-scroll is-recuada">
       ${filtrados.length === 0 ? `<div class="lista-vazio">Nenhuma região encontrada.</div>` : `
       <table class="lista-tabela reg-lista">
         <tbody>
           ${itens.map((r) => {
             const cor = tipoAlvo === "subarea" ? CockpitMap.corDaArea(r) : "#2f6fed";
+            const { ctrls, falhas } = numerosRegiao(tipoAlvo, r.id);
             return `
             <tr class="${linhaSelecionada(tipoAlvo, r.id) ? "is-selecionada" : ""}" data-action="lista-row" data-id="${inst.id}" data-tipo="${tipoAlvo}" data-alvo="${r.id}">
-              <td class="reg-nome" title="${r.nome}"><i class="reg-cor" style="background:${cor}"></i><span class="reg-texto">${nomeSemCodigo(r.nome)}</span></td>
-              <td class="reg-contagem">${contagemRegiaoMarkup(tipoAlvo, r.id)}</td>
+              <td class="reg-nome" title="${r.nome}"><div class="reg-nome-in"><i class="reg-cor" style="background:${cor}"></i><span class="reg-texto">${nomeSemCodigo(r.nome)}</span><span class="reg-falha">${celulaFalhas(falhas)}</span></div></td>
+              <td class="reg-contagem">${celulaControladores(ctrls)}</td>
             </tr>`;
           }).join("")}
         </tbody>
@@ -1522,6 +1579,14 @@ document.addEventListener("input", (e) => {
 
 document.addEventListener("change", (e) => {
   const t = e.target;
+  if (t.matches('[data-input="reg-ordem"]')) {
+    const inst = instances.find((i) => i.id === t.dataset.id);
+    inst.config.listaOrdem = { campo: t.value };
+    inst.config.listaPagina = 1;
+    saveLayout();
+    renderWidgetBody(inst.id);
+    return;
+  }
   if (t.matches('[data-input="map-camada"]')) CockpitMap.setCamada(t.dataset.camada, t.checked);
   if (t.matches('[data-input="map-check"]')) {
     const campo = t.dataset.campo, alvo = t.dataset.alvo;

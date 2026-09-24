@@ -11,6 +11,7 @@ const CockpitMap = (() => {
   let map = null;
   let layerRegioes = null; // polígonos de subárea + linhas de corredor
   let layerEquipamentos = null; // L.markerClusterGroup: com ~1000 semáforos reais o mapa precisa agrupar
+  let layerProblemas = null; // offline/com alerta: fora do agrupamento, sempre visíveis um a um
   let layerDestaque = null; // anel pulsante da busca livre (não filtra, só aponta)
   // id do equipamento -> { marker, chave }. O tick de tempo real chama render() a cada
   // ~6s; em vez de recriar todos os pins, só troca o ícone dos que mudaram de estado.
@@ -21,7 +22,12 @@ const CockpitMap = (() => {
   // painel lateral (app.js), não filtra o resto do mapa.
   let selecao = null; // {tipo:'equipamento', id} | {tipo:'subarea'|'corredor', id}
   let aoSelecionar = () => {};
-  const LARGURA_PAINEL = 340; // painel lateral (à direita do widget); o mapa se afasta dele para não cobrir a seleção
+  // Largura do painel lateral (à direita do widget), para o mapa se afastar dele e não cobrir a
+  // seleção. Mesma conta do CSS de .map-selecao: 30% do mapa, entre 340 e 420px.
+  const larguraPainel = () => {
+    const w = map ? map.getSize().x : 1000;
+    return Math.min(Math.max(340, w * 0.3), 420, w - 20);
+  };
 
   let filtro = {
     subareas: new Set(SUBAREAS.map((s) => s.id)),
@@ -81,6 +87,7 @@ const CockpitMap = (() => {
       disableClusteringAtZoom: 17,
       iconCreateFunction: iconeCluster,
     }).addTo(map);
+    layerProblemas = L.layerGroup().addTo(map);
     layerDestaque = L.layerGroup().addTo(map);
 
     LiveState.subscribe(render);
@@ -162,19 +169,15 @@ const CockpitMap = (() => {
     });
   }
 
-  // O cluster assume a cor do pior estado que agrupa: vermelho (tem offline), âmbar (só
-  // alertas) ou neutro e discreto. O selo mostra quantos dos agrupados têm problema.
+  // Agrupamento só de controladores saudáveis (os com problema ficam fora, em layerProblemas):
+  // sempre neutro. Se ele ficasse vermelho por ter 1 offline entre 40, o mapa pareceria bem
+  // pior do que está.
   function iconeCluster(cluster) {
-    const filhos = cluster.getAllChildMarkers();
-    const offline = filhos.filter((m) => m.options.eqOnline === false).length;
-    const problemas = filhos.filter((m) => m.options.eqOnline === false || m.options.eqAlerta).length;
-    const estado = offline ? "is-offline" : problemas ? "is-alerta" : "";
-    const tam = offline ? 42 : problemas ? 38 : 32;
-    const selo = problemas ? `<span class="map-cluster-prob" title="${problemas} com problema">${problemas}</span>` : "";
+    const n = cluster.getChildCount();
     return L.divIcon({
-      html: `<div class="map-cluster ${estado}" style="width:${tam}px;height:${tam}px"><span>${filhos.length}</span>${selo}</div>`,
+      html: `<div class="map-cluster" style="width:32px;height:32px"><span>${n}</span></div>`,
       className: "",
-      iconSize: [tam, tam],
+      iconSize: [32, 32],
     });
   }
 
@@ -183,7 +186,8 @@ const CockpitMap = (() => {
     const remover = [];
     marcadores.forEach((m, id) => {
       if (!idsVisiveis.has(id)) {
-        remover.push(m.marker);
+        if (m.problema) layerProblemas.removeLayer(m.marker);
+        else remover.push(m.marker);
         marcadores.delete(id);
       }
     });
@@ -197,19 +201,30 @@ const CockpitMap = (() => {
       const chave = `${eq.online}|${alertaAtivo}|${ehSelecionado}`;
       // selecionado por cima de tudo, depois os com problema, por último os saudáveis
       const zIndexOffset = ehSelecionado ? 2000 : !eq.online || alertaAtivo ? 1000 : 0;
+      const problema = !eq.online || alertaAtivo; // com problema: fora do agrupamento
       const existente = marcadores.get(eq.id);
       if (!existente) {
-        const marker = L.marker([eq.lat, eq.lng], { icon: pinEquipamento(eq), eqOnline: eq.online, eqAlerta: alertaAtivo, zIndexOffset });
+        const marker = L.marker([eq.lat, eq.lng], { icon: pinEquipamento(eq), zIndexOffset });
         marker.on("click", () => selecionarEquipamento(eq.id));
-        marcadores.set(eq.id, { marker, chave });
-        adicionar.push(marker);
+        marcadores.set(eq.id, { marker, chave, problema });
+        if (problema) layerProblemas.addLayer(marker);
+        else adicionar.push(marker);
       } else if (existente.chave !== chave) {
-        existente.marker.options.eqOnline = eq.online;
-        existente.marker.options.eqAlerta = alertaAtivo;
         existente.marker.setIcon(pinEquipamento(eq));
         existente.marker.setZIndexOffset(zIndexOffset);
         existente.chave = chave;
-        mudouEstado = true;
+        if (existente.problema !== problema) {
+          // mudou de lado: sai do agrupamento e fica solto, ou volta para o agrupamento
+          if (problema) {
+            layerEquipamentos.removeLayer(existente.marker);
+            layerProblemas.addLayer(existente.marker);
+          } else {
+            layerProblemas.removeLayer(existente.marker);
+            adicionar.push(existente.marker);
+          }
+          existente.problema = problema;
+          mudouEstado = true;
+        }
       }
     });
     if (adicionar.length) layerEquipamentos.addLayers(adicionar);
@@ -268,6 +283,7 @@ const CockpitMap = (() => {
         .on("click", (ev) => {
           L.DomEvent.stopPropagation(ev);
           selecionarRegiao("subarea", s.id);
+          enquadrarRegiao("subarea", s.id); // zoom e centraliza na área, fora da faixa do painel
         })
         .addTo(layerRegioes);
     });
@@ -280,6 +296,7 @@ const CockpitMap = (() => {
       const aoClicar = (ev) => {
         L.DomEvent.stopPropagation(ev);
         selecionarRegiao("corredor", c.id);
+        enquadrarRegiao("corredor", c.id);
       };
       const linha = L.polyline(c.linha, {
         color: destacado ? "var(--red)" : "#2f6fed",
@@ -348,7 +365,7 @@ const CockpitMap = (() => {
 
   // Empurra o mapa para a esquerda se o ponto ficaria escondido atrás do painel (à direita).
   function afastarDoPainel(latlng) {
-    const limite = map.getSize().x - (LARGURA_PAINEL + 50);
+    const limite = map.getSize().x - (larguraPainel() + 50);
     const x = map.latLngToContainerPoint(latlng).x;
     if (x > limite) map.panBy([x - limite, 0]);
   }
@@ -360,7 +377,7 @@ const CockpitMap = (() => {
     if (centralizar) {
       // centro do mapa fica à direita do pin: o pin cai no meio da parte livre, à esquerda do painel
       const zoom = Math.max(map.getZoom(), 17);
-      const alvo = map.project([eq.lat, eq.lng], zoom).add([LARGURA_PAINEL / 2, 0]);
+      const alvo = map.project([eq.lat, eq.lng], zoom).add([larguraPainel() / 2, 0]);
       map.setView(map.unproject(alvo, zoom), zoom, { animate: true });
     } else {
       afastarDoPainel([eq.lat, eq.lng]);
@@ -396,7 +413,7 @@ const CockpitMap = (() => {
     const reg = (regiaoTipo === "subarea" ? SUBAREAS : CORREDORES).find((r) => r.id === id);
     if (!reg) return;
     const bounds = regiaoTipo === "subarea" ? L.polygon(reg.poligono).getBounds() : L.polyline(reg.linha).getBounds();
-    map.fitBounds(bounds, { paddingTopLeft: [40, 60], paddingBottomRight: [LARGURA_PAINEL + 40, 40] });
+    map.fitBounds(bounds, { paddingTopLeft: [40, 60], paddingBottomRight: [larguraPainel() + 40, 40] });
   }
 
   function enquadrarSelecao() {
