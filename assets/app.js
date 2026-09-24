@@ -945,6 +945,53 @@ function paginacaoMarkup(id, pagina, totalPaginas, total, comVerTudo) {
 
 /* ---------- Mapa: markup do header (dropdowns + busca) ---------- */
 
+// Camadas do mapa: o que aparece (subáreas, corredores, controladores). Botão "Camadas" que abre
+// uma lista de caixas de marcar, cada uma com uma amostra de como a camada aparece no mapa (serve
+// de legenda). Substituem os filtros "Subáreas N / Corredores N" (quais regiões), que com as 46
+// subáreas oficiais eram lista longa para uma pergunta que o operador não fazia.
+const CAMADAS_MAPA = [
+  { id: "subareas", label: "Subáreas", amostra: '<i class="camada-amostra is-area"></i>', total: () => SUBAREAS.length },
+  { id: "corredores", label: "Corredores", amostra: '<i class="camada-amostra is-linha"></i>', total: () => CORREDORES.length },
+  {
+    id: "controladores",
+    label: "Controladores",
+    amostra: `<i class="camada-amostra is-pin">${ICONE_PIN_CONTROLADOR}</i>`,
+    total: () => LiveState.getEquipamentos().filter((e) => e.tipo === "semaforo").length,
+  },
+];
+
+const camadasLigadas = (camadas = {}) => CAMADAS_MAPA.filter((c) => camadas[c.id] !== false).length;
+
+function camadasBtnInner(camadas) {
+  const n = camadasLigadas(camadas);
+  return `${ICONS.layers} Camadas${n < CAMADAS_MAPA.length ? ` <span>· ${n}/${CAMADAS_MAPA.length}</span>` : ""}`;
+}
+
+function camadasMarkup(camadas = {}) {
+  return `
+    <div class="map-filtro-btn-wrap" data-filtro-wrap="camadas">
+      <button type="button" class="map-filtro-btn${camadasLigadas(camadas) < CAMADAS_MAPA.length ? " is-active" : ""}" data-action="map-filtro-toggle" data-campo="camadas" data-map-camadas-btn>${camadasBtnInner(camadas)}</button>
+      <div class="filtros-panel" data-filtro-panel="camadas">${dropdownConteudo("camadas")}</div>
+    </div>`;
+}
+
+function camadasPainelMarkup() {
+  const camadas = CockpitMap.getFiltro().camadas || {};
+  return `
+    <div class="filtros-panel-title">Mostrar no mapa</div>
+    <div class="camadas-lista">
+      ${CAMADAS_MAPA.map(
+        (c) => `
+        <label class="camada-linha">
+          <input type="checkbox" data-input="map-camada" data-camada="${c.id}" ${camadas[c.id] !== false ? "checked" : ""}/>
+          ${c.amostra}
+          <span class="camada-nome">${c.label}</span>
+          <span class="camada-total">${c.total()}</span>
+        </label>`
+      ).join("")}
+    </div>`;
+}
+
 function mapaBodyMarkup(inst) {
   const c = CockpitMap.getContagens();
   // busca + filtros ficam sobre o mapa, como controles flutuantes (não uma
@@ -960,10 +1007,7 @@ function mapaBodyMarkup(inst) {
         <span class="map-toggle-trilho"><span class="map-toggle-bola"></span></span>
         Só problemas <span class="map-toggle-n" data-map-problemas>${c.problemas}</span>
       </button>
-      ${filtroBtnMarkup("subareas", "Subáreas", c.subareas)}
-      ${filtroBtnMarkup("corredores", "Corredores", c.corredores)}
-      ${"" /* filtro "Equipamentos" escondido enquanto o mapa mostra só controladores (ver noMapa em map.js):
-      filtroBtnMarkup("categorias", "Equipamentos", c.categorias) */}
+      ${camadasMarkup(inst.config.filtros.camadas)}
     </div>
     <aside class="map-selecao" hidden></aside>
   `;
@@ -987,6 +1031,7 @@ function filtroBtnMarkup(campo, label, contagem) {
 }
 
 function dropdownConteudo(campo) {
+  if (campo === "camadas") return camadasPainelMarkup();
   if (campo === "subareas") {
     return dropdownChecklist("subareas", SUBAREAS, CockpitMap.getFiltro().subareas);
   }
@@ -1040,6 +1085,11 @@ function atualizarCabecalhoMapa({ contagens, focoLabel, filtroSerializado }) {
   if (toggleProblemas) {
     toggleProblemas.setAttribute("aria-pressed", String(!!(filtroSerializado && filtroSerializado.soProblemas)));
     toggleProblemas.querySelector("[data-map-problemas]").textContent = contagens.problemas;
+  }
+  const btnCamadas = document.querySelector("[data-map-camadas-btn]");
+  if (btnCamadas && filtroSerializado && filtroSerializado.camadas) {
+    btnCamadas.innerHTML = camadasBtnInner(filtroSerializado.camadas);
+    btnCamadas.classList.toggle("is-active", camadasLigadas(filtroSerializado.camadas) < CAMADAS_MAPA.length);
   }
   ["subareas", "corredores", "categorias"].forEach((campo) => {
     const btn = document.querySelector(`.map-filtro-btn[data-campo="${campo}"]`);
@@ -1472,6 +1522,7 @@ document.addEventListener("input", (e) => {
 
 document.addEventListener("change", (e) => {
   const t = e.target;
+  if (t.matches('[data-input="map-camada"]')) CockpitMap.setCamada(t.dataset.camada, t.checked);
   if (t.matches('[data-input="map-check"]')) {
     const campo = t.dataset.campo, alvo = t.dataset.alvo;
     if (campo === "categorias") CockpitMap.toggleCategoria(alvo);

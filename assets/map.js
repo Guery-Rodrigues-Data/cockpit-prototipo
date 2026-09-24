@@ -30,6 +30,8 @@ const CockpitMap = (() => {
     statusAlerta: "todos", // 'todos' | 'somente-ativos'
     statusConexao: "todos", // 'todos' | 'online' | 'offline'
     soProblemas: false, // só offline OU com alerta ativo (o OR que os dois filtros acima não fazem)
+    // Camadas: O QUE aparece no mapa (liga/desliga no topo do mapa). Independentes entre si.
+    camadas: { subareas: true, corredores: true, controladores: true },
   };
   // assinatura do que está desenhado na camada de regiões: o tick de tempo real chama render() a
   // cada ~6s, e refazer os polígonos à toa apagaria o destaque de "mouse em cima" no meio do uso
@@ -43,12 +45,15 @@ const CockpitMap = (() => {
     // que foi salvo na sessão anterior em vez de sempre abrir com tudo selecionado.
     if (filtroSalvo) {
       filtro = {
-        subareas: new Set(filtroSalvo.subareas || SUBAREAS.map((s) => s.id)),
-        corredores: new Set(filtroSalvo.corredores || CORREDORES.map((c) => c.id)),
+        // Quais subáreas/corredores: sem controle na tela desde as camadas (24/09), então sempre
+        // todas — um filtro antigo salvo com regiões desmarcadas as esconderia sem ter como voltar.
+        subareas: new Set(SUBAREAS.map((s) => s.id)),
+        corredores: new Set(CORREDORES.map((c) => c.id)),
         categorias: new Set(filtroSalvo.categorias || CATEGORIAS_EQUIPAMENTO.map((c) => c.id)),
         statusAlerta: filtroSalvo.statusAlerta || "todos",
         statusConexao: filtroSalvo.statusConexao || "todos",
         soProblemas: !!filtroSalvo.soProblemas,
+        camadas: { subareas: true, corredores: true, controladores: true, ...(filtroSalvo.camadas || {}) },
       };
     }
     assinaturaRegioes = ""; // camada nova, vazia
@@ -106,6 +111,7 @@ const CockpitMap = (() => {
 
   function equipamentoVisivel(eq) {
     if (!noMapa(eq)) return false;
+    if (eq.tipo === "semaforo" && !filtro.camadas.controladores) return false;
     if (!filtro.categorias.has(eq.tipo)) return false;
     if (filtro.soProblemas && !temProblema(eq)) return false;
     if (filtro.statusConexao === "online" && !eq.online) return false;
@@ -212,6 +218,7 @@ const CockpitMap = (() => {
 
   function assinaturaDasRegioes() {
     return [
+      JSON.stringify(filtro.camadas),
       [...filtro.subareas].join(","),
       [...filtro.corredores].join(","),
       foco ? `${foco.tipo}:${foco.regiaoTipo || ""}:${foco.id}` : "",
@@ -238,7 +245,10 @@ const CockpitMap = (() => {
     layerRegioes.clearLayers();
     const focoRegiaoId = foco && foco.tipo === "regiao" ? foco.id : null;
 
+    // camada desligada não desenha, exceto a região em foco (clicada na lista de Regiões)
+    const emFoco = (tipo, id) => !!foco && foco.tipo === "regiao" && foco.regiaoTipo === tipo && foco.id === id;
     SUBAREAS.forEach((s) => {
+      if (!filtro.camadas.subareas && !emFoco("subarea", s.id)) return;
       if (!filtro.subareas.has(s.id)) return;
       if (foco && foco.tipo === "regiao" && !(foco.regiaoTipo === "subarea" && foco.id === s.id)) return;
       const destacada = focoRegiaoId === s.id || (!!selecao && selecao.tipo === "subarea" && selecao.id === s.id);
@@ -263,6 +273,7 @@ const CockpitMap = (() => {
     });
 
     CORREDORES.forEach((c) => {
+      if (!filtro.camadas.corredores && !emFoco("corredor", c.id)) return;
       if (!filtro.corredores.has(c.id)) return;
       if (foco && foco.tipo === "regiao" && !(foco.regiaoTipo === "corredor" && foco.id === c.id)) return;
       const destacado = focoRegiaoId === c.id || (!!selecao && selecao.tipo === "corredor" && selecao.id === c.id);
@@ -319,6 +330,7 @@ const CockpitMap = (() => {
         statusAlerta: filtro.statusAlerta,
         statusConexao: filtro.statusConexao,
         soProblemas: filtro.soProblemas,
+        camadas: { ...filtro.camadas },
       },
     });
   }
@@ -465,6 +477,10 @@ const CockpitMap = (() => {
     filtro.statusAlerta = valor;
     render();
   }
+  function setCamada(nome, ligada) {
+    filtro.camadas[nome] = !!ligada;
+    render();
+  }
   function setSoProblemas(valor) {
     filtro.soProblemas = !!valor;
     render();
@@ -562,6 +578,7 @@ const CockpitMap = (() => {
     setStatusAlerta,
     setStatusConexao,
     setSoProblemas,
+    setCamada,
     setFiltroCompleto,
     focarEquipamento,
     focarRegiao,
