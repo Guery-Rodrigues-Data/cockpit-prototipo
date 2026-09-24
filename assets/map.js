@@ -64,8 +64,22 @@ const CockpitMap = (() => {
     }
     assinaturaRegioes = ""; // camada nova, vazia
     map = L.map(container, { zoomControl: false }).setView(CENTRO_CURITIBA, 13);
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-      attribution: "&copy; OpenStreetMap, &copy; CARTO",
+    // Mapa base: Esri Light Gray (sem chave). A CARTO passou a exigir chave de API e sem ela
+    // desenha "API KEY REQUIRED" em cada pedaço do mapa (24/09). Fundo cinza-claro + nomes de rua
+    // numa camada separada, acima das áreas coloridas e abaixo dos pinos. Acima do zoom 16 a Esri
+    // não tem imagem própria: o Leaflet amplia a do 16.
+    const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas";
+    L.tileLayer(`${ESRI}/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}`, {
+      attribution: "Mapa &copy; Esri",
+      maxNativeZoom: 16,
+      maxZoom: 19,
+    }).addTo(map);
+    map.createPane("rotulos");
+    map.getPane("rotulos").style.zIndex = 450; // entre as áreas (400) e os pinos (600)
+    map.getPane("rotulos").style.pointerEvents = "none";
+    L.tileLayer(`${ESRI}/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}`, {
+      pane: "rotulos",
+      maxNativeZoom: 16,
       maxZoom: 19,
     }).addTo(map);
     L.control.zoom({ position: "bottomleft" }).addTo(map); // à esquerda: o painel de seleção ocupa a direita
