@@ -403,25 +403,7 @@
       ${corredores.length ? corredores.map((c) => linhaMarkup("corredor", c)).join("") : '<div class="admin-vazio">Nenhum corredor cadastrado.</div>'}
       <h4>Áreas</h4>
       ${areas.length ? areas.map((a) => linhaMarkup("area", a)).join("") : '<div class="admin-vazio">Nenhuma área cadastrada.</div>'}
-      <div class="admin-dica">Dica: clique numa linha ou área cadastrada no mapa; o painel lateral tem Renomear e Excluir.</div>`;
-  }
-
-  /* ---------- ações no painel lateral do Mapa ---------- */
-
-  // Clicar numa região cadastrada no mapa abre o painel lateral (painel-selecao.js); no modo
-  // admin ele ganha Renomear/Excluir. O contêiner .admin-pop é o mesmo que a lista usa, então
-  // os handlers de renomear/excluir abaixo servem aos dois.
-  function acoesNoPainel(sel) {
-    if (sel.tipo === "equipamento") return "";
-    const reg = (sel.tipo === "subarea" ? SUBAREAS : CORREDORES).find((r) => r.id === sel.id);
-    if (!reg || !reg.cadastrado) return "";
-    return `
-      <div class="admin-pop" data-tipo="${sel.tipo === "corredor" ? "corredor" : "area"}" data-id="${reg.id}">
-        <div class="admin-row-acts">
-          <button type="button" data-adm="renomear">Renomear</button>
-          <button type="button" data-adm="excluir" class="is-danger">Excluir</button>
-        </div>
-      </div>`;
+      <div class="admin-dica">Renomear e Excluir ficam só aqui, no modo admin; o painel lateral do Mapa não tem essas ações.</div>`;
   }
 
   function editarNome(linha) {
@@ -451,7 +433,7 @@
     }
     aoMudarRegioes();
     renderLista();
-    CockpitMap.reemitirSelecao(); // redesenha o painel lateral com o nome novo
+    CockpitMap.reemitirSelecao(); // se a região estiver aberta no painel lateral, mostra o nome novo
     toast("Nome atualizado.");
   }
 
@@ -485,7 +467,7 @@
   document.addEventListener("click", (e) => {
     const alvo = e.target.closest("[data-adm]");
     if (!alvo) return;
-    const linha = alvo.closest(".admin-row, .admin-pop");
+    const linha = alvo.closest(".admin-row");
     switch (alvo.dataset.adm) {
       case "novo-corredor": return iniciarDesenho("corredor");
       case "novo-area": return iniciarDesenho("area");
@@ -499,7 +481,7 @@
         return CockpitBus.focarRegiao(linha.dataset.tipo === "corredor" ? "corredor" : "subarea", linha.dataset.id);
       case "renomear": return editarNome(linha);
       case "renomear-salvar": return salvarNome(linha);
-      case "renomear-cancelar": return linha.classList.contains("admin-pop") ? CockpitMap.reemitirSelecao() : renderLista();
+      case "renomear-cancelar": return renderLista();
       case "excluir": return excluir(alvo, linha);
     }
   });
@@ -515,7 +497,7 @@
       if (overlay && e.target.matches?.("#admNome, #admRaio")) return salvarFormulario();
       if (!overlay && desenho && !digitando) return concluirDesenho();
       const linha = e.target.closest && e.target.closest(".admin-row-edit");
-      if (linha) return salvarNome(linha.closest(".admin-row, .admin-pop"));
+      if (linha) return salvarNome(linha.closest(".admin-row"));
     }
     if (!overlay && desenho && !digitando && (e.key === "Backspace" || (e.key === "z" && (e.ctrlKey || e.metaKey)))) {
       e.preventDefault();
@@ -523,6 +505,5 @@
     }
   });
 
-  PainelSelecao.definirAcoesExtras(acoesNoPainel);
   atualizarDock();
 })();

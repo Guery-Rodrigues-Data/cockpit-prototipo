@@ -80,11 +80,6 @@
 
 .admin-dica { padding: 10px 14px 12px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--ink-faint); line-height: 1.4; }
 
-/* ações do admin dentro do painel lateral do Mapa (Renomear / Excluir) */
-.sel-acoes .admin-pop { flex: 1 1 100%; font-family: var(--font-body); }
-.sel-acoes .admin-pop .admin-row-acts { justify-content: flex-end; }
-.sel-acoes .admin-pop .admin-row-edit { flex-wrap: wrap; }
-
 /* o dock é fixo no canto inferior esquerdo: o canvas dos widgets termina acima dele, senão ele
    cobriria a base do mapa (zoom e atribuição) em telas baixas */
 .modo-admin .cockpit-canvas { bottom: 72px; }

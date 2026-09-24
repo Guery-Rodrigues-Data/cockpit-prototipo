@@ -10,7 +10,6 @@
    ========================================================================== */
 
 const PainelSelecao = (() => {
-  let acoesExtras = null; // (sel) => html; o modo admin acrescenta Renomear/Excluir
   let abaAtiva = "geral"; // aba do painel de controlador; mantida ao passar de um controlador para outro
 
   const painelEl = () => document.querySelector(".map-selecao");
@@ -174,7 +173,7 @@ const PainelSelecao = (() => {
     } else {
       abaAtiva = "geral";
     }
-    const acoes = desc.botoes + (acoesExtras ? acoesExtras(sel) : "");
+    const acoes = desc.botoes;
     el.innerHTML = `
       <header class="sel-head">
         <div class="sel-titulo"><strong>${desc.titulo}</strong><span>${desc.sub}</span></div>
@@ -211,8 +210,7 @@ const PainelSelecao = (() => {
     });
   }
 
-  // A cada tick do tempo real só os dados são refeitos, sem mexer nos botões (e num
-  // campo de renomear aberto pelo admin) nem na posição da rolagem.
+  // A cada tick do tempo real só os dados são refeitos, sem mexer nos botões nem na posição da rolagem.
   function atualizarDados({ forcar = false } = {}) {
     const sel = CockpitMap.getSelecao();
     const el = painelEl();
@@ -270,9 +268,6 @@ const PainelSelecao = (() => {
   });
 
   return {
-    definirAcoesExtras(fn) {
-      acoesExtras = fn;
-    },
     redesenharDados() {
       if (CockpitMap.getSelecao()) atualizarDados({ forcar: true });
     },
