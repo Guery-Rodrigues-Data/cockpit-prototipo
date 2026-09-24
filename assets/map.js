@@ -12,6 +12,26 @@ const CockpitMap = (() => {
   let layerRegioes = null; // polígonos de subárea + linhas de corredor
   let layerEquipamentos = null; // L.markerClusterGroup: com ~1000 semáforos reais o mapa precisa agrupar
   let layerProblemas = null; // offline/com alerta: fora do agrupamento, sempre visíveis um a um
+  let bases = null; // mapas de fundo: { esri, osm }
+
+  // Mapa de fundo: Esri cinza para todos; o do OpenStreetMap só vale com o modo admin ligado
+  // (botão "Mapa OSM" no dock do admin), para testar como ficam sentido das vias e detalhes.
+  const CHAVE_MAPA_BASE = "cockpitMapaBaseV1";
+  function mapaBaseAtual() {
+    try {
+      return typeof adminAtivo === "function" && adminAtivo() && localStorage.getItem(CHAVE_MAPA_BASE) === "osm" ? "osm" : "esri";
+    } catch (e) {
+      return "esri";
+    }
+  }
+  function setMapaBase(nome) {
+    try {
+      localStorage.setItem(CHAVE_MAPA_BASE, nome);
+    } catch (e) {}
+    if (!map || !bases) return;
+    Object.values(bases).forEach((b) => map.removeLayer(b));
+    bases[mapaBaseAtual()].addTo(map);
+  }
   let layerDestaque = null; // anel pulsante da busca livre (não filtra, só aponta)
   // id do equipamento -> { marker, chave }. O tick de tempo real chama render() a cada
   // ~6s; em vez de recriar todos os pins, só troca o ícone dos que mudaram de estado.
@@ -69,19 +89,30 @@ const CockpitMap = (() => {
     // numa camada separada, acima das áreas coloridas e abaixo dos pinos. Acima do zoom 16 a Esri
     // não tem imagem própria: o Leaflet amplia a do 16.
     const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas";
-    L.tileLayer(`${ESRI}/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}`, {
-      attribution: "Mapa &copy; Esri",
-      maxNativeZoom: 16,
-      maxZoom: 19,
-    }).addTo(map);
     map.createPane("rotulos");
     map.getPane("rotulos").style.zIndex = 450; // entre as áreas (400) e os pinos (600)
     map.getPane("rotulos").style.pointerEvents = "none";
-    L.tileLayer(`${ESRI}/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}`, {
-      pane: "rotulos",
-      maxNativeZoom: 16,
-      maxZoom: 19,
-    }).addTo(map);
+    bases = {
+      esri: L.layerGroup([
+        L.tileLayer(`${ESRI}/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}`, {
+          attribution: "Mapa &copy; Esri",
+          maxNativeZoom: 16,
+          maxZoom: 19,
+        }),
+        L.tileLayer(`${ESRI}/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}`, {
+          pane: "rotulos",
+          maxNativeZoom: 16,
+          maxZoom: 19,
+        }),
+      ]),
+      // OpenStreetMap padrão: colorido, mas em zoom alto mostra setas de mão única, número e
+      // detalhes das vias. Só para teste no modo admin (ver mapaBaseAtual).
+      osm: L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "&copy; OpenStreetMap",
+        maxZoom: 19,
+      }),
+    };
+    bases[mapaBaseAtual()].addTo(map);
     L.control.zoom({ position: "bottomleft" }).addTo(map); // à esquerda: o painel de seleção ocupa a direita
 
     // O Leaflet só mede o container quando mandam. O grid-stack aplica a altura do widget
@@ -610,6 +641,8 @@ const CockpitMap = (() => {
     setStatusConexao,
     setSoProblemas,
     setCamada,
+    setMapaBase,
+    mapaBaseAtual,
     setFiltroCompleto,
     focarEquipamento,
     focarRegiao,
