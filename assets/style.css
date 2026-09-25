@@ -1124,7 +1124,7 @@ a { color: inherit; }
 
 /* modal "Planos do controlador" (aberto pelo "Ver todos os planos" da aba Plano) — reaproveita o
    .config-modal do app, mais largo e sem Salvar. Uma coluna só, na ordem de leitura de quem programa
-   semáforo: plano → tempos → diagrama → coordenação → quando roda → outros planos. */
+   semáforo: plano (lista + chips) → quando roda → tempos → diagrama → coordenação. */
 /* Padrão visual do sistema (print "Editar dispositivo"): Roboto, título grande sem linha embaixo,
    seção com título escuro em escrita normal + divisória, cantos de 4–8px, botões compactos à
    direita. Os valores continuam como texto (não caixa de input): aqui é só visualização. */
@@ -1151,7 +1151,7 @@ a { color: inherit; }
 }
 
 .plano-chips { display: flex; flex-wrap: wrap; gap: 4px; }
-.plano-quando-h { margin-top: 20px; }
+.plano-id-bloco { display: flex; flex-direction: column; gap: 10px; }
 .plano-chip-novo { border-style: dashed; font-size: 16px; font-weight: 500; color: var(--ink-faint); }
 .plano-chip {
   position: relative; min-width: 34px; height: 30px; padding: 0 8px; border: 1px solid var(--border); border-radius: 4px;

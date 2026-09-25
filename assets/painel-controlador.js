@@ -809,7 +809,7 @@ const PainelControlador = (() => {
 
   /* ---------- Modal "Planos do controlador": todos os planos, só visualização ---------- */
 
-  // De cima pra baixo: plano → tempos → diagrama → coordenação; ao lado, planos (chips + "+") → quando roda (semana).
+  // De cima pra baixo: plano (lista + chips com "+") → quando roda (semana) → tempos → diagrama → coordenação.
   // Sem botão Salvar de propósito: nada aqui envia comando.
   function modalEl() {
     let el = document.getElementById("planoModal");
@@ -874,13 +874,24 @@ const PainelControlador = (() => {
         </div>
         <div class="config-modal-body plano-modal-corpo">
           <section class="plano-detalhe">
-            <!-- Ordem de leitura de quem programa semáforo: qual plano → tempos (ciclo, estágios,
-                 defasagem) → diagrama → coordenação com os vizinhos → quando roda (agenda, no fim).
+            <!-- Ordem: qual plano (lista + chips) → quando roda (agenda, em cima para não sumir no
+                 scroll) → tempos (ciclo, estágios, defasagem) → diagrama → coordenação com os vizinhos.
                  HIPÓTESE: validar com engenheiro de tráfego do cliente. -->
             <!-- sem título nem rótulos: a lista já diz qual plano é e o selo diz se está rodando -->
-            <div class="plano-id">
-              <label class="plano-nav"><span>Plano</span><select class="plano-nav-select" data-plano-select aria-label="Escolher plano">${opcoes}</select></label>
-              ${seloPlano(ehEmCurso, eq.online)}
+            <div class="plano-id-bloco">
+              <div class="plano-id">
+                <label class="plano-nav"><span>Plano</span><select class="plano-nav-select" data-plano-select aria-label="Escolher plano">${opcoes}</select></label>
+                ${seloPlano(ehEmCurso, eq.online)}
+              </div>
+              <div class="plano-chips" role="group" aria-label="Escolher plano para ver">${chips}<button type="button" class="plano-chip plano-chip-novo" data-plano-novo title="Cadastrar novo plano" aria-label="Cadastrar novo plano">+</button></div>
+            </div>
+            <div>
+              <h5 class="plano-modal-h">Quando roda</h5>
+              ${quandoRoda(p.num).length ? "" : '<p class="plano-quando-fora">Fora da tabela horária — não roda sozinho em nenhum dia (só por imposição?)</p>'}
+              <div class="plano-semana">
+                ${semana}
+                <div class="plano-semana-linha is-eixo"><span class="plano-semana-dia"></span>${horasMarkup([0, 3, 6, 9, 12, 15, 18, 21, 24])}</div>
+              </div>
             </div>
             <div>
               <h5 class="plano-modal-h">Tempos</h5>
@@ -912,18 +923,6 @@ const PainelControlador = (() => {
                     : ""
                 }
               </div>
-            </div>
-          </section>
-
-          <section class="plano-quando">
-            <!-- chips no topo, no lugar da lista de dias/horários: a semana abaixo já mostra quando cada plano roda -->
-            <h5 class="plano-modal-h">Planos</h5>
-            <div class="plano-chips" role="group" aria-label="Escolher plano para ver">${chips}<button type="button" class="plano-chip plano-chip-novo" data-plano-novo title="Cadastrar novo plano" aria-label="Cadastrar novo plano">+</button></div>
-            <h5 class="plano-modal-h plano-quando-h">Quando roda</h5>
-            ${quandoRoda(p.num).length ? "" : '<p class="plano-quando-fora">Fora da tabela horária — não roda sozinho em nenhum dia (só por imposição?)</p>'}
-            <div class="plano-semana">
-              ${semana}
-              <div class="plano-semana-linha is-eixo"><span class="plano-semana-dia"></span>${horasMarkup([0, 3, 6, 9, 12, 15, 18, 21, 24])}</div>
             </div>
           </section>
         </div>
