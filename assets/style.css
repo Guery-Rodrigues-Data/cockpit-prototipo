@@ -1124,7 +1124,7 @@ a { color: inherit; }
 
 /* modal "Planos do controlador" (aberto pelo "Ver todos os planos" da aba Plano) — reaproveita o
    .config-modal do app, mais largo e sem Salvar. Uma coluna só, na ordem de leitura de quem programa
-   semáforo: plano (lista + chips) → quando roda → tempos → diagrama → coordenação. */
+   semáforo: plano (lista + chips) → tempos → diagrama → coordenação → quando roda. */
 /* Padrão visual do sistema (print "Editar dispositivo"): Roboto, título grande sem linha embaixo,
    seção com título escuro em escrita normal + divisória, cantos de 4–8px, botões compactos à
    direita. Os valores continuam como texto (não caixa de input): aqui é só visualização. */
