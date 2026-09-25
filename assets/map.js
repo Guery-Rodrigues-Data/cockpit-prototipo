@@ -250,7 +250,7 @@ const CockpitMap = (() => {
       const existente = marcadores.get(eq.id);
       if (!existente) {
         const marker = L.marker([eq.lat, eq.lng], { icon: pinEquipamento(eq), zIndexOffset });
-        marker.on("click", () => selecionarEquipamento(eq.id));
+        marker.on("click", () => selecionarEquipamento(eq.id, { centralizar: true }));
         marcadores.set(eq.id, { marker, chave, problema });
         if (problema) layerProblemas.addLayer(marker);
         else adicionar.push(marker);
