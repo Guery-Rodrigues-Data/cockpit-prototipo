@@ -52,7 +52,8 @@
     <button type="button" data-adm="novo-area">${ICONS.plus} Área</button>
     <button type="button" data-adm="lista">Cadastrados <span class="admin-dock-count" id="admContagem"></span></button>
     <span class="admin-dock-sep"></span>
-    <button type="button" data-adm="telas">Telas</button>`;
+    <button type="button" data-adm="telas">Telas</button>
+    <button type="button" data-adm="mapa-osm" title="Troca o fundo do mapa pelo OpenStreetMap (em zoom alto mostra setas de mão única e detalhes das vias)">Mapa OSM</button>`;
 
   const barra = document.createElement("div");
   barra.className = "admin-drawbar";
@@ -89,6 +90,7 @@
     document.getElementById("admContagem").textContent = corredores.length + areas.length;
     dock.querySelector('[data-adm="lista"]').classList.toggle("is-on", listaAberta);
     dock.querySelector('[data-adm="telas"]').classList.toggle("is-on", telasAbertas);
+    dock.querySelector('[data-adm="mapa-osm"]').classList.toggle("is-on", CockpitMap.mapaBaseAtual() === "osm");
   }
 
   // Telas e Cadastrados abrem no mesmo canto: um fecha o outro.
@@ -505,6 +507,9 @@
       case "novo-area": return iniciarDesenho("area");
       case "lista": return alternarLista();
       case "telas": return alternarTelas();
+      case "mapa-osm":
+        CockpitMap.setMapaBase(CockpitMap.mapaBaseAtual() === "osm" ? "esri" : "osm");
+        return atualizarDock();
       case "desfazer": return desfazerPonto();
       case "concluir": return concluirDesenho();
       case "cancelar": return encerrarDesenho();
