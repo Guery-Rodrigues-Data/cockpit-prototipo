@@ -17,6 +17,9 @@ const CockpitMap = (() => {
   // Mapa de fundo: Esri cinza para todos; o do OpenStreetMap só vale com o modo admin ligado
   // (botão "Mapa OSM" no dock do admin), para testar como ficam sentido das vias e detalhes.
   const CHAVE_MAPA_BASE = "cockpitMapaBaseV1";
+  // balão do agrupamento: lista todos até 8; acima disso mostra 5 e o resto vira "+ N outros"
+  const MAX_LISTA_CLUSTER = 5;
+  const LISTA_CLUSTER_COMPLETA_ATE = 8;
   function mapaBaseAtual() {
     try {
       return typeof adminAtivo === "function" && adminAtivo() && localStorage.getItem(CHAVE_MAPA_BASE) === "osm" ? "osm" : "esri";
@@ -132,6 +135,23 @@ const CockpitMap = (() => {
       disableClusteringAtZoom: 17,
       iconCreateFunction: iconeCluster,
     }).addTo(map);
+    // mouse em cima do número do agrupamento: lista alguns controladores de dentro, sem precisar dar zoom
+    layerEquipamentos.on("clustermouseover", (e) => {
+      const filhos = e.layer.getAllChildMarkers();
+      const mostrar = filhos.length <= LISTA_CLUSTER_COMPLETA_ATE ? filhos.length : MAX_LISTA_CLUSTER;
+      const itens = filhos
+        .slice(0, mostrar)
+        .map((m) => `<li><strong>${m.eqId}</strong><span>${m.eqNome}</span></li>`)
+        .join("");
+      const resto = filhos.length - mostrar;
+      e.layer
+        .bindTooltip(
+          `<b>${filhos.length} controladores</b><ul>${itens}</ul>${resto > 0 ? `<small>+ ${resto} outros · clique para aproximar</small>` : ""}`,
+          { direction: "top", offset: [0, -16], className: "map-eq-tooltip map-cluster-tooltip" }
+        )
+        .openTooltip();
+    });
+    layerEquipamentos.on("clustermouseout", (e) => e.layer.unbindTooltip());
     layerProblemas = L.layerGroup().addTo(map);
     layerDestaque = L.layerGroup().addTo(map);
 
@@ -144,6 +164,7 @@ const CockpitMap = (() => {
   }
 
   function destroy() {
+    fecharMenuContexto();
     if (observadorTamanho) observadorTamanho.disconnect();
     observadorTamanho = null;
     if (map) map.remove();
@@ -250,7 +271,23 @@ const CockpitMap = (() => {
       const existente = marcadores.get(eq.id);
       if (!existente) {
         const marker = L.marker([eq.lat, eq.lng], { icon: pinEquipamento(eq), zIndexOffset });
-        marker.on("click", () => selecionarEquipamento(eq.id));
+        marker.on("click", () => selecionarEquipamento(eq.id, { centralizar: true }));
+        marker.on("contextmenu", (ev) =>
+          abrirMenuContexto(ev, [
+            { label: "Modo de operação", opcoes: MODOS_OPERACAO },
+            { label: "Enviar comando", opcoes: opcoesComando(eq.id) },
+            { label: "Editar tabela horária" },
+            { label: "Abrir detalhes", acao: () => selecionarEquipamento(eq.id, { centralizar: true }) },
+          ])
+        );
+        marker.eqId = eq.id; // para a lista do balão do agrupamento
+        marker.eqNome = eq.nome;
+        // passar o mouse já mostra código e cruzamento, sem abrir o painel (nome já vem escapado)
+        marker.bindTooltip(`<strong>${eq.id}</strong><span>${eq.nome}</span>`, {
+          direction: "top",
+          offset: [0, -14],
+          className: "map-eq-tooltip",
+        });
         marcadores.set(eq.id, { marker, chave, problema });
         if (problema) layerProblemas.addLayer(marker);
         else adicionar.push(marker);
@@ -330,6 +367,20 @@ const CockpitMap = (() => {
           selecionarRegiao("subarea", s.id);
           enquadrarRegiao("subarea", s.id); // zoom e centraliza na área, fora da faixa do painel
         })
+        .on("contextmenu", (ev) =>
+          abrirMenuContexto(ev, [
+            { label: "Modo de operação", opcoes: MODOS_OPERACAO },
+            { label: "Enviar comando para a subárea", opcoes: opcoesComando(null) },
+            { label: "Editar tabela horária da subárea" },
+            {
+              label: "Abrir detalhes",
+              acao: () => {
+                selecionarRegiao("subarea", s.id);
+                enquadrarRegiao("subarea", s.id);
+              },
+            },
+          ])
+        )
         .addTo(layerRegioes);
     });
 
@@ -357,6 +408,151 @@ const CockpitMap = (() => {
         .on("mouseout", () => !destacado && linha.setStyle({ weight: 2.5, opacity: 0.55 }))
         .on("click", aoClicar)
         .addTo(layerRegioes);
+    });
+  }
+
+  /* ---------- menu do botão direito (atalhos) ----------
+     Atalhos sobre controlador/subárea. Ainda não levantados: só "Abrir detalhes" funciona; os
+     demais só avisam (toast) que ainda não existem. HIPÓTESE NÃO VALIDADA: quais atalhos entram, e se "Enviar
+     comando" pode sair direto daqui ou precisa de confirmação/permissão. */
+  let menuContexto = null;
+  // HIPÓTESE NÃO VALIDADA: só os dois primeiros aparecem nos planos de exemplo; os outros são
+  // modos comuns em controlador, a confirmar com a lista real do DP40.
+  const MODOS_OPERACAO = ["Tempo fixo com sincronismo", "Sequência lógica com sincronismo", "Amarelo intermitente", "Apagado"];
+
+  // Comandos de hoje (os mesmos da aba Comandos), com uma linha entre Consultar e Executar.
+  // No controlador: abre o painel na aba Comandos e dispara o botão de lá, então o resultado
+  // aparece no mesmo lugar e Reset/Limpar alarmes continuam pedindo "Confirmar?".
+  // Na subárea (eqId null): envio em massa ainda não existe, só avisa.
+  function opcoesComando(eqId) {
+    const todos = typeof PainelControlador !== "undefined" ? PainelControlador.listaComandos() : [];
+    // na lista original os grupos vêm misturados: Consultar primeiro, depois Executar
+    const lista = [...todos.filter((c) => c.grupo === "consultar"), ...todos.filter((c) => c.grupo !== "consultar")];
+    const opcoes = [];
+    lista.forEach((c, i) => {
+      if (i > 0 && c.grupo !== lista[i - 1].grupo) opcoes.push("-");
+      opcoes.push({ label: c.nome, acao: eqId ? () => comandoPeloMenu(eqId, c.id) : null });
+    });
+    return opcoes;
+  }
+  function comandoPeloMenu(eqId, cmdId) {
+    selecionarEquipamento(eqId, { centralizar: true });
+    setTimeout(() => {
+      document.querySelector('.sel-aba[data-aba="comandos"]')?.click();
+      setTimeout(() => document.querySelector(`[data-sel-cmd="${cmdId}"][data-eq="${eqId}"]`)?.click(), 0);
+    }, 0);
+  }
+
+  function abrirSubmenu(menu, linha) {
+    menu.querySelectorAll(".map-ctx-tem-sub.is-aberto").forEach((l) => l !== linha && l.classList.remove("is-aberto"));
+    if (!linha || linha.classList.contains("is-aberto")) return;
+    linha.classList.add("is-aberto");
+    // perto do rodapé da tela o submenu sobe até caber
+    const sub = linha.querySelector(".map-ctx-sub");
+    sub.style.top = "";
+    const r = sub.getBoundingClientRect();
+    if (r.bottom > innerHeight - 8) sub.style.top = `${-5 - (r.bottom - innerHeight + 8)}px`;
+  }
+
+  function fecharMenuContexto() {
+    if (!menuContexto) return;
+    menuContexto.remove();
+    menuContexto = null;
+    document.removeEventListener("mousedown", aoClicarFora, true);
+    document.removeEventListener("keydown", aoTeclarMenu, true);
+    if (map) map.off("movestart zoomstart", fecharMenuContexto);
+  }
+  function aoClicarFora(e) {
+    if (menuContexto && !menuContexto.contains(e.target)) fecharMenuContexto();
+  }
+  function aoTeclarMenu(e) {
+    if (e.key !== "Escape") return;
+    e.stopImmediatePropagation(); // Esc fecha só o menu, não o painel
+    fecharMenuContexto();
+  }
+
+  function abrirMenuContexto(ev, itens) {
+    L.DomEvent.preventDefault(ev.originalEvent); // sem o menu do navegador
+    L.DomEvent.stopPropagation(ev); // controlador em cima de subárea: abre só o do controlador
+    fecharMenuContexto();
+    const el = document.createElement("div");
+    el.className = "map-ctx-menu";
+    el.setAttribute("role", "menu");
+    itens.forEach((item) => {
+      if (item.opcoes) {
+        // submenu no estilo do Windows: passa o mouse (ou foca) e a lista abre ao lado
+        const linha = document.createElement("div");
+        linha.className = "map-ctx-item map-ctx-tem-sub";
+        linha.tabIndex = 0;
+        linha.setAttribute("role", "menuitem");
+        linha.setAttribute("aria-haspopup", "menu");
+        linha.innerHTML = `<span>${item.label}</span><span class="map-ctx-seta" aria-hidden="true">›</span>`;
+        const sub = document.createElement("div");
+        sub.className = "map-ctx-menu map-ctx-sub";
+        sub.setAttribute("role", "menu");
+        item.opcoes.forEach((o) => {
+          if (o === "-") {
+            sub.insertAdjacentHTML("beforeend", '<div class="map-ctx-sep" role="separator"></div>');
+            return;
+          }
+          const op = typeof o === "string" ? { label: o } : o;
+          const b = document.createElement("button");
+          b.type = "button";
+          b.setAttribute("role", "menuitem");
+          b.className = "map-ctx-item";
+          b.textContent = op.label;
+          b.addEventListener("click", () => {
+            fecharMenuContexto();
+            if (op.acao) op.acao();
+            else if (typeof toast === "function") toast(`"${op.label}" ainda não é enviado ao controlador no protótipo`);
+          });
+          sub.appendChild(b);
+        });
+        linha.appendChild(sub);
+        el.appendChild(linha);
+        return;
+      }
+      const b = document.createElement("button");
+      b.type = "button";
+      b.setAttribute("role", "menuitem");
+      b.className = "map-ctx-item";
+      b.textContent = item.label;
+      b.addEventListener("click", () => {
+        fecharMenuContexto();
+        if (item.acao) item.acao();
+        else if (typeof toast === "function") toast(`"${item.label}" ainda não disponível no protótipo`);
+      });
+      el.appendChild(b);
+    });
+    document.body.appendChild(el);
+    // abre no ponto do clique, sem sair da tela
+    const { clientX: x, clientY: y } = ev.originalEvent;
+    const r = el.getBoundingClientRect();
+    el.style.left = `${Math.min(x, innerWidth - r.width - 8)}px`;
+    el.style.top = `${Math.min(y, innerHeight - r.height - 8)}px`;
+    // sem espaço à direita para o submenu: ele abre para a esquerda
+    if (el.getBoundingClientRect().right + 240 > innerWidth) el.classList.add("is-sub-esquerda");
+    menuContexto = el;
+    document.addEventListener("mousedown", aoClicarFora, true);
+    document.addEventListener("keydown", aoTeclarMenu, true);
+    map.on("movestart zoomstart", fecharMenuContexto);
+    // Submenu controlado aqui, não por :hover/:focus-within no CSS: com CSS, o item focado
+    // deixava um submenu aberto e o do mouse abria outro por cima. Só um aberto por vez.
+    el.addEventListener("mouseover", (e) => {
+      const linha = e.target.closest(".map-ctx-item");
+      if (!linha || linha.parentElement !== el) return; // mouse dentro de um submenu: mantém
+      abrirSubmenu(el, linha.classList.contains("map-ctx-tem-sub") ? linha : null);
+    });
+    el.querySelectorAll(".map-ctx-tem-sub").forEach((linha) => {
+      linha.addEventListener("click", (e) => {
+        if (e.target === linha || e.target.parentElement === linha) abrirSubmenu(el, linha);
+      });
+      linha.addEventListener("keydown", (e) => {
+        if (e.target !== linha || (e.key !== "Enter" && e.key !== "ArrowRight")) return;
+        e.preventDefault();
+        abrirSubmenu(el, linha);
+        linha.querySelector(".map-ctx-sub .map-ctx-item")?.focus();
+      });
     });
   }
 
