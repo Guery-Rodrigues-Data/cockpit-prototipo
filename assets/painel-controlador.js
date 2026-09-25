@@ -809,7 +809,7 @@ const PainelControlador = (() => {
 
   /* ---------- Modal "Planos do controlador": todos os planos, só visualização ---------- */
 
-  // De cima pra baixo: plano (lista + chips com "+") → tempos → diagrama → coordenação → quando roda (semana).
+  // De cima pra baixo: plano → tempos → diagrama → coordenação → quando roda (chips com "+" e semana).
   // Sem botão Salvar de propósito: nada aqui envia comando.
   function modalEl() {
     let el = document.getElementById("planoModal");
@@ -874,8 +874,8 @@ const PainelControlador = (() => {
         </div>
         <div class="config-modal-body plano-modal-corpo">
           <section class="plano-detalhe">
-            <!-- Ordem: qual plano (lista + chips) → tempos (ciclo, estágios, defasagem) → diagrama →
-                 coordenação com os vizinhos → quando roda (agenda, no fim).
+            <!-- Ordem: qual plano → tempos (ciclo, estágios, defasagem) → diagrama →
+                 coordenação com os vizinhos → quando roda (chips + agenda, no fim).
                  HIPÓTESE: validar com engenheiro de tráfego do cliente. -->
             <!-- sem título nem rótulos: a lista já diz qual plano é e o selo diz se está rodando -->
             <div class="plano-id-bloco">
@@ -883,7 +883,6 @@ const PainelControlador = (() => {
                 <label class="plano-nav"><span>Plano</span><select class="plano-nav-select" data-plano-select aria-label="Escolher plano">${opcoes}</select></label>
                 ${seloPlano(ehEmCurso, eq.online)}
               </div>
-              <div class="plano-chips" role="group" aria-label="Escolher plano para ver">${chips}<button type="button" class="plano-chip plano-chip-novo" data-plano-novo title="Cadastrar novo plano" aria-label="Cadastrar novo plano">+</button></div>
             </div>
             <div>
               <h5 class="plano-modal-h">Tempos</h5>
@@ -919,7 +918,8 @@ const PainelControlador = (() => {
             <div>
               <h5 class="plano-modal-h">Quando roda</h5>
               ${quandoRoda(p.num).length ? "" : '<p class="plano-quando-fora">Fora da tabela horária — não roda sozinho em nenhum dia (só por imposição?)</p>'}
-              <!-- régua de horas em cima das barras, logo abaixo do título -->
+              <!-- chips dos planos logo acima da régua de horas; a régua fica em cima das barras -->
+              <div class="plano-chips plano-chips-semana" role="group" aria-label="Escolher plano para ver">${chips}<button type="button" class="plano-chip plano-chip-novo" data-plano-novo title="Cadastrar novo plano" aria-label="Cadastrar novo plano">+</button></div>
               <div class="plano-semana">
                 <div class="plano-semana-linha is-eixo"><span class="plano-semana-dia"></span>${horasMarkup([0, 3, 6, 9, 12, 15, 18, 21, 24])}</div>
                 ${semana}
@@ -1068,5 +1068,8 @@ const PainelControlador = (() => {
   });
 
   // secaoMarkup e campo também servem o painel da área (painel-selecao.js), no mesmo visual da Geral
-  return { abas, dados, carregarGrupos, statusTag, rodapeMarkup, secaoMarkup, campo };
+  // lista para o submenu "Enviar comando" do botão direito no mapa (map.js)
+  const listaComandos = () => COMANDOS.map((c) => ({ id: c.id, nome: c.nome, grupo: c.grupo || "consultar" }));
+
+  return { abas, dados, carregarGrupos, statusTag, rodapeMarkup, secaoMarkup, campo, listaComandos };
 })();

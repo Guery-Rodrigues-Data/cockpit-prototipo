@@ -615,6 +615,17 @@ a { color: inherit; }
 .filtros-seg button.is-active { background: var(--red-tint); color: var(--red); }
 
 #cockpitMap { flex: 1; min-height: 0; }
+.map-eq-tooltip {
+  display: flex; flex-direction: column; gap: 1px;
+  font-family: var(--font-body) !important; font-size: 12px !important; border-radius: 6px !important;
+}
+.map-eq-tooltip strong { font-size: 11px; font-weight: 600; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.map-eq-tooltip span { font-weight: 600; color: var(--ink); }
+.map-cluster-tooltip ul { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.map-cluster-tooltip li { display: flex; gap: 8px; align-items: baseline; }
+.map-cluster-tooltip li strong { min-width: 44px; }
+.map-cluster-tooltip li span { font-weight: 500; }
+.map-cluster-tooltip small { margin-top: 4px; font-size: 11px; color: var(--ink-faint); }
 .map-region-tooltip {
   font-family: var(--font-body) !important;
   font-size: 11.5px !important;
@@ -1124,7 +1135,7 @@ a { color: inherit; }
 
 /* modal "Planos do controlador" (aberto pelo "Ver todos os planos" da aba Plano) — reaproveita o
    .config-modal do app, mais largo e sem Salvar. Uma coluna só, na ordem de leitura de quem programa
-   semáforo: plano (lista + chips) → tempos → diagrama → coordenação → quando roda. */
+   semáforo: plano → tempos → diagrama → coordenação → quando roda (chips + semana). */
 /* Padrão visual do sistema (print "Editar dispositivo"): Roboto, título grande sem linha embaixo,
    seção com título escuro em escrita normal + divisória, cantos de 4–8px, botões compactos à
    direita. Os valores continuam como texto (não caixa de input): aqui é só visualização. */
@@ -1152,6 +1163,7 @@ a { color: inherit; }
 
 .plano-chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .plano-id-bloco { display: flex; flex-direction: column; gap: 10px; }
+.plano-chips-semana { margin-bottom: 12px; }
 .plano-chip-novo { border-style: dashed; font-size: 16px; font-weight: 500; color: var(--ink-faint); }
 .plano-chip {
   position: relative; min-width: 34px; height: 30px; padding: 0 8px; border: 1px solid var(--border); border-radius: 4px;
@@ -1243,3 +1255,23 @@ a { color: inherit; }
 /* painel da área: número que pede atenção (offline, alertas) em vermelho */
 .sel-campo .sel-valor-alerta { color: var(--red); }
 .sel-campo em.sel-valor-alerta { font-size: 11px; font-weight: 600; font-style: normal; }
+
+/* menu do botão direito no mapa (controlador / subárea) */
+.map-ctx-menu {
+  position: fixed; z-index: 1050; min-width: 220px; max-width: 320px; padding: 4px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow-lg);
+  font-family: var(--font-body); display: flex; flex-direction: column;
+}
+.map-ctx-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 10px;
+  border: none; border-radius: 4px; background: none; font: inherit; font-size: 13px; color: var(--ink);
+  text-align: left; cursor: pointer;
+}
+.map-ctx-item:hover, .map-ctx-item:focus-visible { background: var(--surface-sunken); outline: none; }
+.map-ctx-tem-sub { position: relative; cursor: default; }
+.map-ctx-seta { font-size: 15px; line-height: 1; color: var(--ink-faint); }
+.map-ctx-sub { display: none; position: absolute; top: -5px; left: 100%; min-width: 220px; } /* colado no item: sem vão, o hover não se perde no caminho */
+.map-ctx-menu.is-sub-esquerda .map-ctx-sub { left: auto; right: 100%; }
+.map-ctx-tem-sub.is-aberto > .map-ctx-sub { display: flex; }
+.map-ctx-tem-sub.is-aberto { background: var(--surface-sunken); }
+.map-ctx-sep { height: 1px; margin: 4px 6px; background: var(--border); }
