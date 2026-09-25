@@ -89,7 +89,8 @@ function montarSemaforos(linhas) {
     .map((c) => ({
       id: c.id,
       tipo: "semaforo",
-      nome: escaparHtml(c.via || c.id),
+      // cruzamento provisório (cruzamentos.js) no lugar da via sozinha, pedido da operação
+      nome: escaparHtml((typeof CRUZAMENTOS !== "undefined" && CRUZAMENTOS[c.id]) || c.via || c.id),
       lat: c.lat,
       lng: c.lng,
       ...regiaoDoPonto(c.lat, c.lng),
