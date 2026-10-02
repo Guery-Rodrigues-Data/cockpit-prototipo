@@ -107,6 +107,13 @@
           <span class="submenu-item-desc">Exibição dos dispositivos agrupados em subáreas ou corredores.</span>
         </span>
       </button>
+      <button type="button" class="submenu-item" data-action="add-widget" data-type="resumo">
+        <span class="submenu-item-icon" id="libIconResumo"></span>
+        <span>
+          <span class="submenu-item-title">Resumo</span>
+          <span class="submenu-item-desc">Totais da operação e legenda do mapa: modos de controle, offline e alertas.</span>
+        </span>
+      </button>
     </div>
   </div>
 </div>
@@ -147,6 +154,7 @@
       <button type="button" class="widget-icon-btn" data-action="modal-close" title="Fechar" id="modalCloseBtn"></button>
     </div>
     <div class="config-modal-body" id="configModalBody"></div>
+    <p class="config-modal-nota" id="configModalNota" hidden>O card mostra apenas os dados que atendem às opções acima.</p>
     <div class="config-modal-actions">
       <button type="button" class="btn-secondary" data-action="modal-cancel">Cancelar</button>
       <button type="button" class="btn-primary" data-action="modal-save">Salvar</button>
@@ -167,7 +175,9 @@
 <script src="assets/regioes.js"></script>
 <script src="assets/map.js"></script>
 <script src="assets/app.js"></script>
+<script src="assets/grade-horarios.js"></script>
 <script src="assets/painel-controlador.js"></script>
+<script src="assets/lab-quando-roda.js"></script>
 <script src="assets/painel-selecao.js"></script>
 <script>
   // ícones que precisam do objeto ICONS (definido em app.js) já carregado
@@ -175,6 +185,7 @@
   document.getElementById("libIconDispositivos").innerHTML = ICONS.cpu;
   document.getElementById("libIconAlertas").innerHTML = ICONS.alertTriangle;
   document.getElementById("libIconRegioes").innerHTML = ICONS.layers;
+  document.getElementById("libIconResumo").innerHTML = ICONS.dashboard;
   document.getElementById("modalCloseBtn").innerHTML = ICONS.x;
   document.getElementById("iconAdd1").innerHTML = ICONS.plus;
   document.getElementById("iconAdd2").innerHTML = ICONS.plus;

@@ -8,7 +8,7 @@
 const CENTRO_CURITIBA = [-25.4322, -49.2723];
 
 const CATEGORIAS_EQUIPAMENTO = [
-  { id: "semaforo", label: "Semáforos" },
+  { id: "semaforo", label: "Controladores" },
   { id: "camera", label: "Câmeras" },
   { id: "radar", label: "Radares" },
   { id: "nobreak", label: "Nobreaks" },
