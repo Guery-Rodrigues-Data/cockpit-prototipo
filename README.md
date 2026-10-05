@@ -45,8 +45,8 @@ Ou pelo [Painel de Protótipos](../prototipos-painel) (`node server.mjs`, porta 
 descobre esta pasta sozinho por ter `_serve.ps1`.
 
 Local não pede senha. No deploy da Vercel o site inteiro fica atrás de HTTP Basic Auth
-(`middleware.js`): usuário `dataprom`, senha `dat@taprom-2016`. Dá pra sobrescrever sem
-commit pelas Environment Variables `SITE_USUARIO` / `SITE_SENHA` no projeto da Vercel.
+(`middleware.js`), com usuário e senha definidos nas Environment Variables `SITE_USUARIO` /
+`SITE_SENHA` do projeto na Vercel (não ficam no código). Sem as variáveis, o site fica fechado.
 
 ## Fora de escopo (herdado do Épico)
 

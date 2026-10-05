@@ -1,12 +1,9 @@
-// Vercel Edge Middleware — trava o site inteiro atrás de uma senha fixa (HTTP Basic Auth).
+// Vercel Edge Middleware — trava o site inteiro atrás de usuário e senha (HTTP Basic Auth).
 // Só atua no deploy da Vercel; rodando local com _serve.ps1 este arquivo nem é usado.
 //
-// Trocar a senha: mude USUARIO_PADRAO / SENHA_PADRAO aqui embaixo, OU defina
-// SITE_USUARIO / SITE_SENHA nas Environment Variables do projeto na Vercel (têm prioridade
-// e não ficam no Git).
-
-const USUARIO_PADRAO = "dataprom";
-const SENHA_PADRAO = "dat@taprom-2016";
+// Usuário e senha NÃO ficam no código: defina SITE_USUARIO e SITE_SENHA em Settings >
+// Environment Variables do projeto na Vercel e faça um novo deploy. Sem essas variáveis o
+// site fica fechado para todo mundo.
 
 export const config = {
   // roda em todas as rotas, menos o favicon
@@ -14,13 +11,13 @@ export const config = {
 };
 
 export default function middleware(request) {
-  const usuario = process.env.SITE_USUARIO || USUARIO_PADRAO;
-  const senha = process.env.SITE_SENHA || SENHA_PADRAO;
+  const usuario = process.env.SITE_USUARIO;
+  const senha = process.env.SITE_SENHA;
 
   const header = request.headers.get("authorization") || "";
   const [tipo, credenciais] = header.split(" ");
 
-  if (tipo === "Basic" && credenciais) {
+  if (usuario && senha && tipo === "Basic" && credenciais) {
     let decodificado = "";
     try {
       decodificado = atob(credenciais);
