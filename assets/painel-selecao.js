@@ -56,6 +56,35 @@ const PainelSelecao = (() => {
   }
 
   // Mesmo visual da aba Geral do controlador: bloco de campos no topo + seções recolhíveis.
+  // Alertas ativos dos equipamentos que estão dentro da região.
+  function alertasDaRegiao(tipo, regId) {
+    const ids = new Set(equipamentosDaRegiao(tipo, regId).map((e) => e.id));
+    return LiveState.getAlertas().filter((a) => ids.has(a.equipamentoId));
+  }
+
+  // Aba Alertas da região: resumo por severidade + a lista dos alertas (clicar abre o equipamento).
+  function alertasRegiaoMarkup(tipo, reg) {
+    const alertas = alertasDaRegiao(tipo, reg.id);
+    if (!alertas.length) return '<div class="sel-bloco"><div class="sel-vazio">Nenhum alerta ativo nesta região.</div></div>';
+    const { campo } = PainelControlador;
+    const severidades = SEVERIDADES.map((sev) => [sev, alertas.filter((a) => a.severidade === sev).length]);
+    const ordenados = [...alertas].sort((a, b) => SEVERIDADES.indexOf(a.severidade) - SEVERIDADES.indexOf(b.severidade));
+    return `
+      <div class="sel-bloco"><div class="sel-campos">${severidades.map(([sev, n]) => campo(sev, `<strong${n && (sev === "Crítico" || sev === "Alto") ? ' class="sel-valor-alerta"' : ""}>${n}</strong>`)).join("")}</div></div>
+      <div class="sel-bloco">
+        ${ordenados
+          .map((a) => {
+            const eq = LiveState.equipamentoPorId(a.equipamentoId);
+            return `
+          <button type="button" class="sel-item" data-sel-acao="abrir" data-alvo="${a.equipamentoId}">
+            <span><strong>${eq ? eq.nome : a.equipamentoId}</strong><span class="id-mono">${a.descricao} · ${a.dataHora}</span></span>
+            <span class="severidade-tag" data-sev="${a.severidade}">${a.severidade}</span>
+          </button>`;
+          })
+          .join("")}
+      </div>`;
+  }
+
   function dadosRegiaoMarkup(tipo, reg) {
     const { campo, secaoMarkup } = PainelControlador;
     const forte = (v, alerta) => `<strong${alerta ? ' class="sel-valor-alerta"' : ""}>${v}</strong>`;
@@ -86,15 +115,17 @@ const PainelSelecao = (() => {
     const status = `<div class="sel-campos">
       ${campo("Online", forte(eqs.length - offline))}
       ${campo("Offline", forte(offline, offline > 0))}
+    </div>
+    <div class="sel-tipos">
       ${porCategoria
-        .map(({ c, total, off }) => campo(c.label, `${forte(total)}${off ? `<em class="sel-valor-alerta">${off} offline</em>` : ""}`))
+        .map(({ c, total, off }) => {
+          const dica = `${c.label}: ${total}${off ? ` (${off} offline)` : ""}`;
+          return `<span class="sel-tipo${off ? " tem-offline" : ""}" title="${dica}" aria-label="${dica}">
+            <span class="sel-tipo-icone">${ICONES_CATEGORIA[c.id] || ""}</span><strong>${total}</strong>${off ? `<em class="sel-valor-alerta">${off} off</em>` : ""}
+          </span>`;
+        })
         .join("")}
     </div>`;
-
-    const severidades = SEVERIDADES.map((sev) => [sev, alertas.filter((a) => a.severidade === sev).length]);
-    const alertasSecao = alertas.length
-      ? `<div class="sel-campos">${severidades.map(([sev, n]) => campo(sev, forte(n))).join("")}</div>`
-      : '<div class="sel-vazio">Nenhum alerta ativo.</div>';
 
     const atencaoSecao = atencao.length
       ? atencao
@@ -112,7 +143,6 @@ const PainelSelecao = (() => {
     return `
       <div class="sel-bloco">${topo}</div>
       ${secaoMarkup("regiao-status", "Status dos dispositivos", eqs.length ? status : '<div class="sel-vazio">Nenhum dispositivo dentro desta região.</div>')}
-      ${secaoMarkup("regiao-alertas", "Alertas por severidade", alertasSecao)}
       ${secaoMarkup("regiao-atencao", `Precisam de atenção${atencao.length ? ` (${atencao.length})` : ""}`, atencaoSecao)}`;
   }
 
@@ -136,10 +166,15 @@ const PainelSelecao = (() => {
     }
     const reg = regiaoPor(sel.tipo, sel.id);
     if (!reg) return null;
+    const n = alertasDaRegiao(sel.tipo, sel.id).length;
     return {
       titulo: reg.nome,
       sub: `${reg.id} · ${sel.tipo === "subarea" ? "Subárea" : "Corredor"}`,
-      dados: () => dadosRegiaoMarkup(sel.tipo, regiaoPor(sel.tipo, sel.id)),
+      abas: [
+        { id: "geral", label: "Geral" },
+        { id: "alertas", label: `Alertas${n ? ` <span class="sel-aba-n">${n}</span>` : ""}` },
+      ],
+      dados: (aba) => (aba === "alertas" ? alertasRegiaoMarkup(sel.tipo, regiaoPor(sel.tipo, sel.id)) : dadosRegiaoMarkup(sel.tipo, regiaoPor(sel.tipo, sel.id))),
       botoes: "", // enquadrar e filtrar já acontecem ao clicar na lista de Regiões
     };
   }

@@ -3,3 +3,6 @@ node_modules/
 .DS_Store
 Thumbs.db
 *.log
+
+# capturas de requests do sistema legado (dados reais de infraestrutura, só locais)
+Dados/

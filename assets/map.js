@@ -22,7 +22,9 @@ const CockpitMap = (() => {
   const LISTA_CLUSTER_COMPLETA_ATE = 8;
   function mapaBaseAtual() {
     try {
-      return typeof adminAtivo === "function" && adminAtivo() && localStorage.getItem(CHAVE_MAPA_BASE) === "osm" ? "osm" : "esri";
+      const salvo = localStorage.getItem(CHAVE_MAPA_BASE);
+      if (salvo === "satelite") return "satelite";
+      return typeof adminAtivo === "function" && adminAtivo() && salvo === "osm" ? "osm" : "esri";
     } catch (e) {
       return "esri";
     }
@@ -34,6 +36,12 @@ const CockpitMap = (() => {
     if (!map || !bases) return;
     Object.values(bases).forEach((b) => map.removeLayer(b));
     bases[mapaBaseAtual()].addTo(map);
+    atualizarSeletorBase();
+  }
+  // botões "Mapa | Satélite" (canto inferior esquerdo): marca o fundo em uso
+  function atualizarSeletorBase() {
+    const atual = mapaBaseAtual();
+    document.querySelectorAll("[data-mapa-base]").forEach((b) => b.classList.toggle("is-active", b.dataset.mapaBase === atual));
   }
   let layerDestaque = null; // anel pulsante da busca livre (não filtra, só aponta)
   // id do equipamento -> { marker, chave }. O tick de tempo real chama render() a cada
@@ -108,6 +116,20 @@ const CockpitMap = (() => {
           maxZoom: 19,
         }),
       ]),
+      // Imagem de satélite da Esri (sem chave) + nomes de ruas/bairros por cima, na mesma camada
+      // de rótulos do mapa cinza (acima das áreas, abaixo dos pinos).
+      satelite: L.layerGroup([
+        L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+          attribution: "Imagens &copy; Esri, Maxar, Earthstar Geographics",
+          maxNativeZoom: 19,
+          maxZoom: 19,
+        }),
+        L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}", {
+          pane: "rotulos",
+          maxNativeZoom: 19,
+          maxZoom: 19,
+        }),
+      ]),
       // OpenStreetMap padrão: colorido, mas em zoom alto mostra setas de mão única, número e
       // detalhes das vias. Só para teste no modo admin (ver mapaBaseAtual).
       osm: L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -116,7 +138,30 @@ const CockpitMap = (() => {
       }),
     };
     bases[mapaBaseAtual()].addTo(map);
-    L.control.zoom({ position: "bottomleft" }).addTo(map); // à esquerda: o painel de seleção ocupa a direita
+    // Canto inferior direito: zoom +/− e, abaixo, "Centralizar" (enquadra tudo o que está visível).
+    // Leaflet empilha no canto de baixo o último adicionado por cima, então o centralizar entra antes.
+    const btnCentralizar = L.control({ position: "bottomright" });
+    btnCentralizar.onAdd = () => {
+      const el = L.DomUtil.create("div", "leaflet-bar mapa-ctrl-centralizar");
+      el.innerHTML = `<a href="#" role="button" title="Centralizar: enquadrar tudo na tela" aria-label="Centralizar o mapa"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"/><circle cx="8" cy="8" r="1.6" fill="currentColor" stroke="none"/></svg></a>`;
+      L.DomEvent.disableClickPropagation(el);
+      L.DomEvent.on(el.firstChild, "click", (e) => { L.DomEvent.preventDefault(e); enquadrarVisiveis(); });
+      return el;
+    };
+    btnCentralizar.addTo(map);
+    L.control.zoom({ position: "bottomright" }).addTo(map);
+
+    // Canto inferior esquerdo: troca do fundo do mapa (onde ficava o zoom).
+    const seletorBase = L.control({ position: "bottomleft" });
+    seletorBase.onAdd = () => {
+      const el = L.DomUtil.create("div", "mapa-ctrl-base");
+      el.innerHTML = `<button type="button" data-mapa-base="esri">Mapa</button><button type="button" data-mapa-base="satelite">Satélite</button>`;
+      L.DomEvent.disableClickPropagation(el);
+      el.querySelectorAll("button").forEach((b) => L.DomEvent.on(b, "click", () => setMapaBase(b.dataset.mapaBase)));
+      return el;
+    };
+    seletorBase.addTo(map);
+    atualizarSeletorBase();
 
     // O Leaflet só mede o container quando mandam. O grid-stack aplica a altura do widget
     // depois de montar, e a janela ou o widget podem mudar depois; sem observar, o mapa ficava
@@ -187,6 +232,16 @@ const CockpitMap = (() => {
     if (eq.tipo === "semaforo" && !filtro.camadas.controladores) return false;
     if (!filtro.categorias.has(eq.tipo)) return false;
     if (filtro.soProblemas && !temProblema(eq)) return false;
+    if (filtroIds && !filtroIds.has(eq.id)) return false;
+    if (filtroResumo.modo && LiveState.modoDoControlador(eq.id) !== filtroResumo.modo) return false;
+    if (filtroResumo.status && LiveState.statusDoControlador(eq.id) !== filtroResumo.status) return false;
+    if (filtroResumo.estado === "offline" && eq.online) return false;
+    if (filtroResumo.estado === "alerta" && (!eq.online || LiveState.alertasDoEquipamento(eq.id).length === 0)) return false;
+    // "olho" do Resumo: o que o operador escondeu linha a linha (independe do filtro "só este" acima)
+    if (ocultosResumo.modo.has(LiveState.modoDoControlador(eq.id))) return false;
+    if (ocultosResumo.status.has(LiveState.statusDoControlador(eq.id))) return false;
+    if (ocultosResumo.estado.has("offline") && !eq.online) return false;
+    if (ocultosResumo.estado.has("alerta") && eq.online && LiveState.alertasDoEquipamento(eq.id).length > 0) return false;
     if (filtro.statusConexao === "online" && !eq.online) return false;
     if (filtro.statusConexao === "offline" && eq.online) return false;
     if (filtro.statusAlerta === "somente-ativos" && LiveState.alertasDoEquipamento(eq.id).length === 0) return false;
@@ -202,6 +257,16 @@ const CockpitMap = (() => {
   // Problema = offline ou com alerta ativo. É o que o operador precisa achar no meio de ~1000.
   const temProblema = (eq) => !eq.online || LiveState.alertasDoEquipamento(eq.id).length > 0;
 
+  // true = os controladores saudáveis do mapa estão esmaecidos pra o problema saltar (ver render())
+  let saudaveisEsmaecidos = false;
+  // Filtro vindo do widget Resumo: modo de controle ("centro"|"operador"|"local") e/ou estado
+  // ("offline"|"alerta"). null = sem filtro naquele grupo. Esconde do mapa quem não bate (ver equipamentoVisivel).
+  let filtroResumo = { modo: null, status: null, estado: null };
+  let filtroIds = null; // Set de ids de equipamento: quando definido, só eles aparecem (ex.: grupo clicado em Alertas)
+  let ocultosResumo = { modo: new Set(), status: new Set(), estado: new Set() }; // valores escondidos pelo olho
+  const LIMITE_SOLTAR_FILTRADO = 40; // até quantos pinos filtrados ficam soltos, sem agrupar
+  const esmaece = (eq) => saudaveisEsmaecidos && !temProblema(eq);
+
   // Controlador: sempre o pino próprio; o estado vai numa bolinha no canto (vermelho = offline,
   // âmbar = alerta, sem bolinha = ok), pra problema não sumir no meio de ~1000 pinos iguais.
   // Demais categorias (fora do mapa por ora): ponto discreto se ok, pin com ícone se problema.
@@ -209,9 +274,11 @@ const CockpitMap = (() => {
     const alertaAtivo = LiveState.alertasDoEquipamento(eq.id).length > 0;
     const sel = !!selecao && selecao.tipo === "equipamento" && selecao.id === eq.id;
     if (eq.tipo === "semaforo") {
+      // duas bolinhas independentes: estado (offline/alerta) no canto direito, modo (Operador, azul) no esquerdo
+      const modo = LiveState.modoDoControlador(eq.id);
       const estado = !eq.online ? "offline" : alertaAtivo ? "alerta" : "ok";
       return L.divIcon({
-        html: `<div class="map-ctrl-pin${sel ? " is-selecionado" : ""}" data-estado="${estado}">${ICONE_PIN_CONTROLADOR}</div>`,
+        html: `<div class="map-ctrl-pin${sel ? " is-selecionado" : ""}${esmaece(eq) ? " is-esmaecido" : ""}" data-estado="${estado}" data-modo="${modo}">${ICONE_PIN_CONTROLADOR}</div>`,
         className: "",
         iconSize: [24, 28],
         iconAnchor: [12, 27],
@@ -261,13 +328,15 @@ const CockpitMap = (() => {
 
     const adicionar = [];
     let mudouEstado = false;
+    // Filtro do Resumo com poucos resultados: agrupar 2–4 pinos só atrapalha, então ficam todos soltos.
+    const soltarTodos = (!!filtroIds || !!filtroResumo.modo || !!filtroResumo.status || !!filtroResumo.estado) && lista.length <= LIMITE_SOLTAR_FILTRADO;
     lista.forEach((eq) => {
       const alertaAtivo = LiveState.alertasDoEquipamento(eq.id).length > 0;
       const ehSelecionado = !!selecao && selecao.tipo === "equipamento" && selecao.id === eq.id;
-      const chave = `${eq.online}|${alertaAtivo}|${ehSelecionado}`;
-      // selecionado por cima de tudo, depois os com problema, por último os saudáveis
-      const zIndexOffset = ehSelecionado ? 2000 : !eq.online || alertaAtivo ? 1000 : 0;
-      const problema = !eq.online || alertaAtivo; // com problema: fora do agrupamento
+      const chave = `${eq.online}|${alertaAtivo}|${ehSelecionado}|${esmaece(eq)}|${LiveState.modoDoControlador(eq.id)}|${soltarTodos}`;
+      // selecionado por cima de tudo, depois os com problema (ou em destaque), por último os saudáveis
+      const problema = !eq.online || alertaAtivo || soltarTodos; // com problema (ou filtro pequeno): fora do agrupamento
+      const zIndexOffset = ehSelecionado ? 2000 : problema ? 1000 : 0;
       const existente = marcadores.get(eq.id);
       if (!existente) {
         const marker = L.marker([eq.lat, eq.lng], { icon: pinEquipamento(eq), zIndexOffset });
@@ -276,6 +345,7 @@ const CockpitMap = (() => {
           abrirMenuContexto(ev, [
             { label: "Modo de operação", opcoes: MODOS_OPERACAO },
             { label: "Enviar comando", opcoes: opcoesComando(eq.id) },
+            { label: "Ajustar tempos (plano registrado)", acao: () => PainelControlador.abrirAjuste(eq.id) },
             { label: "Editar tabela horária" },
             { label: "Abrir detalhes", acao: () => selecionarEquipamento(eq.id, { centralizar: true }) },
           ])
@@ -526,10 +596,15 @@ const CockpitMap = (() => {
     });
     document.body.appendChild(el);
     // abre no ponto do clique, sem sair da tela
-    const { clientX: x, clientY: y } = ev.originalEvent;
+    // Posição pelo ponto do Leaflet (containerPoint + canto do mapa na tela), que sempre vem;
+    // clientX/Y do evento pode faltar e aí o menu caía no topo da página.
+    const oe = ev.originalEvent || {};
+    const caixa = map.getContainer().getBoundingClientRect();
+    const x = Number.isFinite(oe.clientX) ? oe.clientX : caixa.left + ev.containerPoint.x;
+    const y = Number.isFinite(oe.clientY) ? oe.clientY : caixa.top + ev.containerPoint.y;
     const r = el.getBoundingClientRect();
-    el.style.left = `${Math.min(x, innerWidth - r.width - 8)}px`;
-    el.style.top = `${Math.min(y, innerHeight - r.height - 8)}px`;
+    el.style.left = `${Math.max(8, Math.min(x, innerWidth - r.width - 8))}px`;
+    el.style.top = `${Math.max(8, Math.min(y, innerHeight - r.height - 8))}px`;
     // sem espaço à direita para o submenu: ele abre para a esquerda
     if (el.getBoundingClientRect().right + 240 > innerWidth) el.classList.add("is-sub-esquerda");
     menuContexto = el;
@@ -575,6 +650,14 @@ const CockpitMap = (() => {
       }
       return equipamentoVisivel(eq);
     });
+
+    // Tela inicial de resolução: com ao menos um problema no que está visível, os saudáveis esmaecem
+    // (continuam no mapa, dão contexto) e os problemas saltam. Sem problema nenhum, nada esmaece
+    // (não haveria o que destacar, e o mapa não pode parecer vazio).
+    saudaveisEsmaecidos = lista.some(temProblema);
+
+    // Agrupamentos só contêm controladores saudáveis (os com problema ficam soltos), então esmaecem junto
+    map.getContainer().classList.toggle("map-esmaece-saudaveis", saudaveisEsmaecidos);
 
     sincronizarMarcadores(lista);
 
@@ -655,6 +738,20 @@ const CockpitMap = (() => {
     if (!reg) return;
     const bounds = regiaoTipo === "subarea" ? L.polygon(reg.poligono).getBounds() : L.polyline(reg.linha).getBounds();
     map.fitBounds(bounds, { paddingTopLeft: [40, 60], paddingBottomRight: [larguraPainel() + 40, 40] });
+  }
+
+  // Depois de filtrar pelos widgets: ajusta o zoom e centraliza para caber o que ficou visível.
+  // Inclui as regiões quando o filtro de regiões é só um subconjunto. Com painel lateral aberto,
+  // deixa a folga dele à direita. Não chamar a cada tick de tempo real (mexeria no mapa à toa).
+  function enquadrarVisiveis() {
+    if (!map) return;
+    const pts = LiveState.getEquipamentos().filter(equipamentoVisivel).map((e) => [e.lat, e.lng]);
+    if (filtro.subareas.size < SUBAREAS.length) SUBAREAS.filter((s) => filtro.subareas.has(s.id)).forEach((s) => pts.push(...s.poligono));
+    if (filtro.corredores.size < CORREDORES.length) CORREDORES.filter((c) => filtro.corredores.has(c.id)).forEach((c) => pts.push(...c.linha));
+    if (!pts.length) return;
+    const direita = selecao ? larguraPainel() + 40 : 40;
+    if (pts.length === 1) { map.setView(pts[0], 17, { animate: true }); return; }
+    map.fitBounds(L.latLngBounds(pts), { paddingTopLeft: [40, 60], paddingBottomRight: [direita, 40], maxZoom: 17, animate: true });
   }
 
   function enquadrarSelecao() {
@@ -766,6 +863,33 @@ const CockpitMap = (() => {
     render();
   }
 
+  // Widget Resumo: filtra o mapa por modo de controle e/ou estado (parcial: só o que vier no objeto
+  // muda; null limpa aquele grupo). Ver LiveState.modoDoControlador (dado simulado por ora).
+  function setFiltroResumo(parcial) {
+    filtroResumo = { ...filtroResumo, ...parcial };
+    render();
+  }
+  // Filtra o mapa por uma lista de equipamentos (null limpa). Usado pelos grupos clicados em Alertas.
+  function setFiltroIds(ids) {
+    filtroIds = ids && ids.length ? new Set(ids) : null;
+    render();
+  }
+  function getFiltroIds() {
+    return filtroIds ? new Set(filtroIds) : null;
+  }
+  function getFiltroResumo() {
+    return { ...filtroResumo };
+  }
+  // Olho do Resumo: esconde/mostra no mapa quem tem aquele valor (grupo: "modo" | "status" | "estado").
+  function toggleOcultoResumo(grupo, valor) {
+    const set = ocultosResumo[grupo];
+    set.has(valor) ? set.delete(valor) : set.add(valor);
+    render();
+  }
+  function getOcultosResumo() {
+    return { modo: new Set(ocultosResumo.modo), status: new Set(ocultosResumo.status), estado: new Set(ocultosResumo.estado) };
+  }
+
   function limparFoco() {
     foco = null;
     render();
@@ -826,6 +950,7 @@ const CockpitMap = (() => {
     limparSelecao,
     reemitirSelecao,
     enquadrarSelecao,
+    enquadrarVisiveis,
     getSelecao,
     setFiltroRegioes,
     getContagens,
@@ -834,6 +959,12 @@ const CockpitMap = (() => {
     toggleCategoria,
     setTodas,
     setStatusAlerta,
+    setFiltroResumo,
+    getFiltroResumo,
+    setFiltroIds,
+    getFiltroIds,
+    toggleOcultoResumo,
+    getOcultosResumo,
     setStatusConexao,
     setSoProblemas,
     setCamada,
