@@ -10,7 +10,10 @@
 const CockpitMap = (() => {
   let map = null;
   let layerRegioes = null; // polígonos de subárea + linhas de corredor
-  let layerEquipamentos = null; // L.markerClusterGroup: com ~1000 semáforos reais o mapa precisa agrupar
+  // Agrupamento: UM L.markerClusterGroup por subárea (chave = id da subárea; "_sem" = sem subárea cadastrada). Cada
+  // grupo só junta pinos da própria subárea, então um número nunca mistura subáreas ("10 erros" que eram 1 numa e 9
+  // noutra). Quem não tem subárea agrupa por proximidade, entre si. Com ~1000 semáforos reais o mapa precisa agrupar.
+  const gruposCluster = new Map();
   let layerProblemas = null; // offline/com alerta: fora do agrupamento, sempre visíveis um a um
   let bases = null; // mapas de fundo: { esri, osm }
 
@@ -66,7 +69,10 @@ const CockpitMap = (() => {
     categorias: new Set(CATEGORIAS_EQUIPAMENTO.map((c) => c.id)),
     statusAlerta: "todos", // 'todos' | 'somente-ativos'
     statusConexao: "todos", // 'todos' | 'online' | 'offline'
-    soProblemas: false, // só offline OU com alerta ativo (o OR que os dois filtros acima não fazem)
+    // Seletor de alertas no topo do mapa: "todos" (só posição) | "todos-alertas" (todos, alertas em destaque) | "so-alertas"
+    // (só com alarme ativo ou em modo operador, visaoPadrao). soProblemas é derivado dele (aplicarModoAlertas).
+    modoAlertas: "todos",
+    soProblemas: false,
     // Camadas: O QUE aparece no mapa (liga/desliga no topo do mapa). Independentes entre si.
     camadas: { subareas: true, corredores: true, controladores: true },
   };
@@ -89,8 +95,12 @@ const CockpitMap = (() => {
         categorias: new Set(filtroSalvo.categorias || CATEGORIAS_EQUIPAMENTO.map((c) => c.id)),
         statusAlerta: filtroSalvo.statusAlerta || "todos",
         statusConexao: filtroSalvo.statusConexao || "todos",
-        soProblemas: !!filtroSalvo.soProblemas,
-        camadas: { subareas: true, corredores: true, controladores: true, ...(filtroSalvo.camadas || {}) },
+        // o modo escolhido persiste (no sistema real, no perfil do usuário; aqui, no layout salvo)
+        modoAlertas: ["todos", "todos-alertas", "so-alertas"].includes(filtroSalvo.modoAlertas) ? filtroSalvo.modoAlertas : "todos",
+        soProblemas: false,
+        // só "subareas" tem opção na legenda; corredores e controladores ficam sempre ligados (um valor salvo "desligado"
+        // de antes esconderia o que a legenda já não deixa religar)
+        camadas: { subareas: true, ...(filtroSalvo.camadas || {}), corredores: true, controladores: true },
       };
     }
     assinaturaRegioes = ""; // camada nova, vazia
@@ -138,6 +148,10 @@ const CockpitMap = (() => {
       }),
     };
     bases[mapaBaseAtual()].addTo(map);
+    // O Leaflet chama container.focus() a cada clique no mapa e o navegador rola o canvas do cockpit para mostrar o mapa inteiro
+    // (o Mapa da tela padrão passa uns 45 px da borda): a tela "puxava para cima" em todo clique. O foco continua, sem rolar.
+    const contMapa = map.getContainer();
+    contMapa.focus = (opcoes) => HTMLElement.prototype.focus.call(contMapa, { ...opcoes, preventScroll: true });
     // Canto inferior direito: zoom +/− e, abaixo, "Centralizar" (enquadra tudo o que está visível).
     // Leaflet empilha no canto de baixo o último adicionado por cima, então o centralizar entra antes.
     const btnCentralizar = L.control({ position: "bottomright" });
@@ -174,29 +188,7 @@ const CockpitMap = (() => {
     observadorTamanho.observe(container);
 
     layerRegioes = L.layerGroup().addTo(map);
-    layerEquipamentos = L.markerClusterGroup({
-      showCoverageOnHover: false,
-      maxClusterRadius: 50,
-      disableClusteringAtZoom: 17,
-      iconCreateFunction: iconeCluster,
-    }).addTo(map);
-    // mouse em cima do número do agrupamento: lista alguns controladores de dentro, sem precisar dar zoom
-    layerEquipamentos.on("clustermouseover", (e) => {
-      const filhos = e.layer.getAllChildMarkers();
-      const mostrar = filhos.length <= LISTA_CLUSTER_COMPLETA_ATE ? filhos.length : MAX_LISTA_CLUSTER;
-      const itens = filhos
-        .slice(0, mostrar)
-        .map((m) => `<li><strong>${m.eqId}</strong><span>${m.eqNome}</span></li>`)
-        .join("");
-      const resto = filhos.length - mostrar;
-      e.layer
-        .bindTooltip(
-          `<b>${filhos.length} controladores</b><ul>${itens}</ul>${resto > 0 ? `<small>+ ${resto} outros · clique para aproximar</small>` : ""}`,
-          { direction: "top", offset: [0, -16], className: "map-eq-tooltip map-cluster-tooltip" }
-        )
-        .openTooltip();
-    });
-    layerEquipamentos.on("clustermouseout", (e) => e.layer.unbindTooltip());
+    gruposCluster.clear(); // os grupos nascem sob demanda, um por subárea (ver grupoCluster)
     layerProblemas = L.layerGroup().addTo(map);
     layerDestaque = L.layerGroup().addTo(map);
 
@@ -225,13 +217,15 @@ const CockpitMap = (() => {
   // Por enquanto o mapa mostra só controladores (pedido do Guery, 24/09). As outras categorias
   // continuam nos dados e nos widgets; para voltar, basta tirar esta checagem e reexibir o filtro
   // "Equipamentos" em app.js.
-  const noMapa = (eq) => eq.tipo === "semaforo";
+  // "sim" = dispositivo simulado no modo admin (Quantidade): entra no mapa de qualquer tipo, para testar volume
+  const noMapa = (eq) => eq.tipo === "semaforo" || eq.origem === "sim";
 
   function equipamentoVisivel(eq) {
     if (!noMapa(eq)) return false;
-    if (eq.tipo === "semaforo" && !filtro.camadas.controladores) return false;
+    if (!filtro.camadas.controladores) return false; // camada "Dispositivos"
     if (!filtro.categorias.has(eq.tipo)) return false;
-    if (filtro.soProblemas && !temProblema(eq)) return false;
+    if (tiposGlobais && !tiposGlobais.has(eq.tipo)) return false;
+    if (filtro.soProblemas && !visaoPadrao(eq)) return false; // toggle "Somente alertas": vale junto com qualquer outro recorte
     if (filtroIds && !filtroIds.has(eq.id)) return false;
     if (filtroResumo.modo && LiveState.modoDoControlador(eq.id) !== filtroResumo.modo) return false;
     if (filtroResumo.status && LiveState.statusDoControlador(eq.id) !== filtroResumo.status) return false;
@@ -245,38 +239,75 @@ const CockpitMap = (() => {
     if (filtro.statusConexao === "online" && !eq.online) return false;
     if (filtro.statusConexao === "offline" && eq.online) return false;
     if (filtro.statusAlerta === "somente-ativos" && LiveState.alertasDoEquipamento(eq.id).length === 0) return false;
-    // gate por região: só se aplica se o equipamento pertence a alguma; solto sempre passa
+    // gate por região: com todas as regiões escolhidas, quem não pertence a nenhuma passa (solto). Com recorte de
+    // regiões ("Corredores com falha", por exemplo), só aparece quem está numa região escolhida: o resto some.
     if (eq.subareaId || eq.corredorId) {
       const passaSubarea = eq.subareaId && filtro.subareas.has(eq.subareaId);
       const passaCorredor = eq.corredorId && filtro.corredores.has(eq.corredorId);
       if (!passaSubarea && !passaCorredor) return false;
+    } else if (!todasRegioes()) {
+      return false;
     }
+    if (regiaoSoFalha && !temProblema(eq)) return false;
     return true;
   }
 
   // Problema = offline ou com alerta ativo. É o que o operador precisa achar no meio de ~1000.
   const temProblema = (eq) => !eq.online || LiveState.alertasDoEquipamento(eq.id).length > 0;
 
+  // "Somente alertas" (antes era a visão padrão, TESTE pedido da operação): só quem tem alerta ativo ou está em modo operador.
+  // HIPÓTESE NÃO VALIDADA: dispositivo offline SEM alerta fica de fora; e "modo operador" ainda é dado simulado.
+  const visaoPadrao = (eq) => LiveState.alertasDoEquipamento(eq.id).length > 0 || LiveState.modoDoControlador(eq.id) === "operador";
+  // A visão padrão cede a qualquer recorte explícito (card clicado, Resumo, grupo de Alertas, status de conexão/alerta,
+  // regiões escolhidas): sem isso, "Offline" ou "Corredores com falha" mostraria só a interseção com a visão padrão e
+  // esconderia os controladores da região (os offline sem alarme, por exemplo).
+  const todasRegioes = () => filtro.subareas.size >= SUBAREAS.length && filtro.corredores.size >= CORREDORES.length;
+  const baseAtiva = () =>
+    filtro.soProblemas && !recorteDeCard && !filtroIds && !filtroResumo.modo && !filtroResumo.status && !filtroResumo.estado &&
+    filtro.statusConexao === "todos" && filtro.statusAlerta === "todos" && todasRegioes();
+
   // true = os controladores saudáveis do mapa estão esmaecidos pra o problema saltar (ver render())
   let saudaveisEsmaecidos = false;
   // Filtro vindo do widget Resumo: modo de controle ("centro"|"operador"|"local") e/ou estado
   // ("offline"|"alerta"). null = sem filtro naquele grupo. Esconde do mapa quem não bate (ver equipamentoVisivel).
   let filtroResumo = { modo: null, status: null, estado: null };
+  // "Subáreas/Corredores com falha" (Resumo): além de só as regiões escolhidas, só os controladores COM falha dentro delas.
+  // Qualquer outra mudança de região (filtros do mapa, card, ×) desliga isto.
+  let regiaoSoFalha = false;
+  // Um card clicado define sozinho o que o mapa mostra (ex.: "Dispositivos: 1000" mostra os 1000): a visão padrão não vale por cima.
+  let recorteDeCard = false;
+  // Filtro geral da tela (app.js): tipos de dispositivo permitidos em todos os widgets; por cima do filtro de categorias do mapa
+  let tiposGlobais = null;
   let filtroIds = null; // Set de ids de equipamento: quando definido, só eles aparecem (ex.: grupo clicado em Alertas)
   let ocultosResumo = { modo: new Set(), status: new Set(), estado: new Set() }; // valores escondidos pelo olho
   const LIMITE_SOLTAR_FILTRADO = 40; // até quantos pinos filtrados ficam soltos, sem agrupar
-  const esmaece = (eq) => saudaveisEsmaecidos && !temProblema(eq);
+  const resumoAtivo = () => !!(filtroResumo.modo || filtroResumo.status || filtroResumo.estado);
+  // semEstado: o mapa só mostra POSIÇÃO — pino neutro, sem offline/alerta/modo, sem esmaecer. Vale na v1 (versoes.js) e,
+  // nas outras versões, no modo "Todos" do seletor de alertas (filtro.modoAlertas); atualizado em aplicarModoAlertas().
+  let semEstado = true;
+  function aplicarModoAlertas() {
+    // Regra de conceito (v2 e v3): o mapa mostra TUDO e fica estático (só posição). Não há seletor Todos / Todos + alertas / Só alertas;
+    // o estado dos pinos só aparece quando um grupo do widget Alertas é clicado (filtroIds). Layouts antigos salvos com outro modo são ignorados.
+    filtro.modoAlertas = "todos";
+    filtro.soProblemas = filtro.modoAlertas === "so-alertas"; // o resto do mapa segue lendo soProblemas
+    // grupo clicado no widget de Alertas = recorte de dispositivos com alerta: ali o estado aparece mesmo no modo "Todos"
+    // idem quando o recorte vem do card Alertas ("somente com alerta ativo") ou de status de conexão: o estado aparece em cima do pino
+    const recorteDeEstado = Versoes.tem("mapa.estado") && (filtro.statusAlerta === "somente-ativos" || filtro.statusConexao !== "todos");
+    semEstado = filtro.modoAlertas === "todos" && !filtroIds && !recorteDeEstado;
+  }
+  const esmaece = (eq) => !semEstado && saudaveisEsmaecidos && !temProblema(eq);
 
   // Controlador: sempre o pino próprio; o estado vai numa bolinha no canto (vermelho = offline,
   // âmbar = alerta, sem bolinha = ok), pra problema não sumir no meio de ~1000 pinos iguais.
   // Demais categorias (fora do mapa por ora): ponto discreto se ok, pin com ícone se problema.
   function pinEquipamento(eq) {
-    const alertaAtivo = LiveState.alertasDoEquipamento(eq.id).length > 0;
+    const alertaAtivo = !semEstado && LiveState.alertasDoEquipamento(eq.id).length > 0;
+    const online = semEstado || eq.online;
     const sel = !!selecao && selecao.tipo === "equipamento" && selecao.id === eq.id;
-    if (eq.tipo === "semaforo") {
+    if (eq.tipo === "semaforo" || semEstado) { // v1: todos os tipos usam o mesmo pino (são todos iguais nesta versão)
       // duas bolinhas independentes: estado (offline/alerta) no canto direito, modo (Operador, azul) no esquerdo
-      const modo = LiveState.modoDoControlador(eq.id);
-      const estado = !eq.online ? "offline" : alertaAtivo ? "alerta" : "ok";
+      const modo = semEstado ? "centro" : LiveState.modoDoControlador(eq.id);
+      const estado = !online ? "offline" : alertaAtivo ? "alerta" : "ok";
       return L.divIcon({
         html: `<div class="map-ctrl-pin${sel ? " is-selecionado" : ""}${esmaece(eq) ? " is-esmaecido" : ""}" data-estado="${estado}" data-modo="${modo}">${ICONE_PIN_CONTROLADOR}</div>`,
         className: "",
@@ -284,7 +315,7 @@ const CockpitMap = (() => {
         iconAnchor: [12, 27],
       });
     }
-    if (eq.online && !alertaAtivo) {
+    if (online && !alertaAtivo) {
       return L.divIcon({
         html: `<div class="map-dot${sel ? " is-selecionado" : ""}"></div>`,
         className: "",
@@ -302,40 +333,144 @@ const CockpitMap = (() => {
     });
   }
 
-  // Agrupamento só de controladores saudáveis (os com problema ficam fora, em layerProblemas):
-  // sempre neutro. Se ele ficasse vermelho por ter 1 offline entre 40, o mapa pareceria bem
-  // pior do que está.
+  // Agrupamento. Na vista MISTA só tem saudável (os com problema ficam soltos, em layerProblemas) e ele é sempre neutro:
+  // vermelho por 1 offline entre 40 faria o mapa parecer pior do que está. Na vista SÓ DE PROBLEMAS (visão padrão ou
+  // "só com falha"), tudo é agrupado por proximidade e o agrupamento leva a cor do pior estado de dentro:
+  // vermelho se há offline, âmbar se há alarme.
   function iconeCluster(cluster) {
     const n = cluster.getChildCount();
+    const pior = Math.max(0, ...cluster.getAllChildMarkers().map((mk) => mk.eqEstado || 0)); // 2 offline, 1 alarme
+    const estado = pior === 2 ? " is-offline" : pior === 1 ? " is-alerta" : "";
     return L.divIcon({
-      html: `<div class="map-cluster" style="width:32px;height:32px"><span>${n}</span></div>`,
+      html: `<div class="map-cluster${estado}" style="width:32px;height:32px"><span>${n}</span></div>`,
       className: "",
       iconSize: [32, 32],
     });
   }
 
+  // Regra de conceito (v2 e v3): os dispositivos se agrupam em UM ícone por subárea e por tipo (nunca mistura subáreas nem tipos).
+  // De longe cada subárea+tipo vira um número só; chegando perto (ou clicando no número) abre nos dispositivos.
+  const ZOOM_DESAGRUPA = 15; // a partir daqui o agrupamento por subárea começa a se desfazer (ver maxClusterRadius)
+  const chaveCluster = (eq) => `${eq.subareaId || "_sem"}|${eq.tipo || "_"}`;
+  const subareaDaChave = (chave) => chave.split("|")[0];
+
+  // Regra geral (todas as versões): quanto mais dispositivos no mapa, mais o mapa se defende da poluição — agrupa com
+  // raio maior e mantém os pinos pequenos por mais zoom. O volume esperado é de 1000 a 2000 (Guery, 2026-10-07).
+  // Contínuo (não em degraus): 1000 → ×1,5, 2000 → ×2, 4000 → ×2,75 (teto). Antes o fator era 1 até 1000 e só subia
+  // depois, e o Guery viu o mapa com ~1000 mais bagunçado que com 2000 — o degrau de baixo era o mais fraco de todos.
+  // Arredondado de 0,25 em 0,25 para não recriar os agrupamentos a cada dispositivo a mais.
+  // HIPÓTESE NÃO VALIDADA: a curva (1,4 × (n/1000)^0,45) é chute; calibrar vendo o mapa e o zoom do admin.
+  const fatorDensidade = () => {
+    const n = LiveState.getEquipamentos().filter(noMapa).length;
+    const bruto = 1.4 * Math.pow(Math.max(n, 1) / 1000, 0.45);
+    return Math.round(Math.min(2.75, Math.max(0.75, bruto)) * 4) / 4;
+  };
+
+  // Tamanho do pino por zoom: de longe é só uma marca pequena; de perto, o pino inteiro. A escala vai numa variável CSS
+  // do container (--pin-escala), então trocar de zoom não recria nenhum pino. Passando do zoom 15 o pino CRESCE além do
+  // tamanho base (o Guery achou pequeno no zoom 16): 15 = base, 16 = 1,3x, 17+ = 1,5x. Com muito dispositivo
+  // (~1000 ou mais) os zooms até 15 ficam um pouco menores (x0,85), para a poluição de longe, sem encolher os de perto.
+  // HIPÓTESE NÃO VALIDADA: os tamanhos são chute; calibrar com o zoom mostrado no admin.
+  function aplicarEscalaPino() {
+    if (!map) return;
+    const z = map.getZoom();
+    let escala = z <= 12 ? 0.55 : z <= 14 ? 0.75 : z < 16 ? 1 : z < 17 ? 1.3 : 1.5;
+    if (z <= 15 && fatorDensidade() >= 1.5) escala *= 0.85;
+    map.getContainer().style.setProperty("--pin-escala", String(Math.round(escala * 100) / 100));
+  }
+
+  function grupoCluster(chave) {
+    let g = gruposCluster.get(chave);
+    if (g) return g;
+    g = L.markerClusterGroup({
+      showCoverageOnHover: false,
+      // raio menor quanto mais perto: de longe junta mais, de perto só o que realmente se sobrepõe
+      // raio enorme até o zoom 14 (a partir do 15 já vai desagrupando): a subárea inteira vira UM ícone (o agrupamento já é por subárea+tipo); de perto, só o que se sobrepõe
+      maxClusterRadius: (zoom) => (zoom <= 14 ? 4000 : Math.round(30 * fatorDensidade())),
+      disableClusteringAtZoom: 17,
+      zoomToBoundsOnClick: false, // o enquadramento é feito abaixo (clusterclick), para focar só no que está dentro do clicado
+      iconCreateFunction: iconeCluster,
+    }).addTo(map);
+    // clique no número do agrupamento: enquadra os dispositivos de dentro, mas nunca abaixo do zoom 15 (onde o agrupamento já
+    // começa a se desfazer). Sem esse piso, uma subárea grande "cabe" no zoom 12 e o clique só movia o mapa, sem abrir nada.
+    // Máximo 17, onde os pinos já ficam soltos.
+    g.on("clusterclick", (e) => {
+      e.layer.unbindTooltip();
+      const b = e.layer.getBounds();
+      const caber = map.getBoundsZoom(b, false, L.point(80, 104));
+      const zoom = Math.min(17, Math.max(caber, ZOOM_DESAGRUPA));
+      map.setView(b.getCenter(), zoom, { animate: true });
+    });
+    // mouse em cima do número do agrupamento: lista alguns controladores de dentro, sem precisar dar zoom
+    g.on("clustermouseover", (e) => {
+      const filhos = e.layer.getAllChildMarkers();
+      const mostrar = filhos.length <= LISTA_CLUSTER_COMPLETA_ATE ? filhos.length : MAX_LISTA_CLUSTER;
+      const itens = filhos
+        .slice(0, mostrar)
+        .map((mk) => `<li><strong>${mk.eqId}</strong><span>${mk.eqNome}</span></li>`)
+        .join("");
+      const resto = filhos.length - mostrar;
+      const sa = subareaDaChave(chave);
+      const onde = sa === "_sem" ? "" : ` · ${nomeSubarea(sa)}`;
+      e.layer
+        .bindTooltip(
+          `<b>${filhos.length} controladores${onde}</b><ul>${itens}</ul>${resto > 0 ? `<small>+ ${resto} outros · clique para aproximar</small>` : ""}`,
+          { direction: "top", offset: [0, -16], className: "map-eq-tooltip map-cluster-tooltip" }
+        )
+        .openTooltip();
+    });
+    g.on("clustermouseout", (e) => e.layer.unbindTooltip());
+    gruposCluster.set(chave, g);
+    return g;
+  }
+
+  // O raio de agrupamento é fixado quando o grupo nasce. Se o total de dispositivos muda de faixa (ex.: simulação do
+  // admin, "Quantidade"), os grupos são descartados e recriados com o fator novo; os pinos voltam no fluxo normal abaixo.
+  let fatorAplicado = null;
+  function recriarGruposSeDensidadeMudou() {
+    const f = fatorDensidade();
+    if (fatorAplicado === null) { fatorAplicado = f; return; }
+    if (f === fatorAplicado) return;
+    fatorAplicado = f;
+    gruposCluster.forEach((g) => map.removeLayer(g));
+    gruposCluster.clear();
+    marcadores.clear();
+    layerProblemas.clearLayers();
+    aplicarEscalaPino();
+  }
+
   function sincronizarMarcadores(lista) {
+    recriarGruposSeDensidadeMudou();
     const idsVisiveis = new Set(lista.map((eq) => eq.id));
-    const remover = [];
+    const remover = new Map(); // chave do grupo -> marcadores a tirar dele
     marcadores.forEach((m, id) => {
       if (!idsVisiveis.has(id)) {
         if (m.problema) layerProblemas.removeLayer(m.marker);
-        else remover.push(m.marker);
+        else { if (!remover.has(m.grupo)) remover.set(m.grupo, []); remover.get(m.grupo).push(m.marker); }
         marcadores.delete(id);
       }
     });
-    if (remover.length) layerEquipamentos.removeLayers(remover);
+    remover.forEach((lista2, g) => grupoCluster(g).removeLayers(lista2));
 
-    const adicionar = [];
+    const adicionar = new Map(); // chave do grupo -> marcadores a pôr nele
+    const poeNoGrupo = (g, mk) => { if (!adicionar.has(g)) adicionar.set(g, []); adicionar.get(g).push(mk); };
     let mudouEstado = false;
+    // Vista só de problemas: tudo entra no agrupamento (perto vira um número) em vez de ficar solto, um a um.
+    // Modo "Todos" (semEstado) não tem estado: tudo agrupado e neutro, como na v1. "Todos + alertas": com alerta solto, o resto agrupado.
+    const agruparTudo = baseAtiva() || regiaoSoFalha || !semEstado; // recorte com estado (card Alertas etc.) também agrupa por subárea+tipo
+    // ...mas se já sobrou pouca coisa (é só erro e o recorte é pequeno), não precisa agrupar: ficam todos soltos.
+    const soltarPoucos = agruparTudo && lista.length <= LIMITE_SOLTAR_FILTRADO;
     // Filtro do Resumo com poucos resultados: agrupar 2–4 pinos só atrapalha, então ficam todos soltos.
     const soltarTodos = (!!filtroIds || !!filtroResumo.modo || !!filtroResumo.status || !!filtroResumo.estado) && lista.length <= LIMITE_SOLTAR_FILTRADO;
     lista.forEach((eq) => {
-      const alertaAtivo = LiveState.alertasDoEquipamento(eq.id).length > 0;
+      const alertaAtivo = !semEstado && LiveState.alertasDoEquipamento(eq.id).length > 0;
+      const online = semEstado || eq.online;
       const ehSelecionado = !!selecao && selecao.tipo === "equipamento" && selecao.id === eq.id;
-      const chave = `${eq.online}|${alertaAtivo}|${ehSelecionado}|${esmaece(eq)}|${LiveState.modoDoControlador(eq.id)}|${soltarTodos}`;
+      const chave = `${online}|${alertaAtivo}|${ehSelecionado}|${esmaece(eq)}|${LiveState.modoDoControlador(eq.id)}|${soltarTodos}|${agruparTudo}|${soltarPoucos}|${chaveCluster(eq)}`;
+      const estadoNum = !online ? 2 : alertaAtivo ? 1 : 0;
       // selecionado por cima de tudo, depois os com problema (ou em destaque), por último os saudáveis
-      const problema = !eq.online || alertaAtivo || soltarTodos; // com problema (ou filtro pequeno): fora do agrupamento
+      // fora do agrupamento: com problema na vista mista, filtro pequeno do Resumo, ou vista só de erros com poucos itens
+      const problema = soltarPoucos || (!agruparTudo && (!online || alertaAtivo || soltarTodos));
       const zIndexOffset = ehSelecionado ? 2000 : problema ? 1000 : 0;
       const existente = marcadores.get(eq.id);
       if (!existente) {
@@ -350,6 +485,7 @@ const CockpitMap = (() => {
             { label: "Abrir detalhes", acao: () => selecionarEquipamento(eq.id, { centralizar: true }) },
           ])
         );
+        marker.eqEstado = estadoNum; // cor do agrupamento (pior estado de dentro)
         marker.eqId = eq.id; // para a lista do balão do agrupamento
         marker.eqNome = eq.nome;
         // passar o mouse já mostra código e cruzamento, sem abrir o painel (nome já vem escapado)
@@ -358,40 +494,91 @@ const CockpitMap = (() => {
           offset: [0, -14],
           className: "map-eq-tooltip",
         });
-        marcadores.set(eq.id, { marker, chave, problema });
+        marcadores.set(eq.id, { marker, chave, problema, grupo: chaveCluster(eq) });
         if (problema) layerProblemas.addLayer(marker);
-        else adicionar.push(marker);
+        else poeNoGrupo(chaveCluster(eq), marker);
       } else if (existente.chave !== chave) {
+        existente.marker.eqEstado = estadoNum;
+        if (!existente.problema) mudouEstado = true; // está no agrupamento: refaz o ícone dele
         existente.marker.setIcon(pinEquipamento(eq));
         existente.marker.setZIndexOffset(zIndexOffset);
         existente.chave = chave;
+        const grupo = chaveCluster(eq);
+        if (existente.grupo !== grupo) {
+          // mudou de subárea (cadastro/admin): sai do agrupamento antigo e entra no da subárea nova
+          if (!existente.problema) grupoCluster(existente.grupo).removeLayer(existente.marker);
+          if (!existente.problema && !problema) poeNoGrupo(grupo, existente.marker); // se virou "solto", o bloco abaixo cuida
+          existente.grupo = grupo;
+          mudouEstado = true;
+        }
         if (existente.problema !== problema) {
           // mudou de lado: sai do agrupamento e fica solto, ou volta para o agrupamento
           if (problema) {
-            layerEquipamentos.removeLayer(existente.marker);
+            grupoCluster(existente.grupo).removeLayer(existente.marker);
             layerProblemas.addLayer(existente.marker);
           } else {
             layerProblemas.removeLayer(existente.marker);
-            adicionar.push(existente.marker);
+            poeNoGrupo(existente.grupo, existente.marker);
           }
           existente.problema = problema;
           mudouEstado = true;
         }
       }
     });
-    if (adicionar.length) layerEquipamentos.addLayers(adicionar);
-    if (mudouEstado) layerEquipamentos.refreshClusters();
+    adicionar.forEach((lista2, g) => grupoCluster(g).addLayers(lista2));
+    if (mudouEstado) gruposCluster.forEach((g) => g.refreshClusters());
   }
+
+  // Escala única, do mais claro ao mais escuro conforme a quantidade de controladores com falha (offline ou alarme).
+  // Faixas absolutas (não relativas ao pior caso), para a cor significar o mesmo em qualquer tela e na lista de Regiões.
+  const FAIXAS_ERROS = [
+    { ate: 0, cor: "#c9ced6" }, // sem falha: cinza neutro
+    { ate: 1, cor: "#f6c4bf" },
+    { ate: 3, cor: "#ee8f86" },
+    { ate: 6, cor: "#dc4f44" },
+    { ate: 10, cor: "#b32a20" },
+    { ate: Infinity, cor: "#7d1912" },
+  ];
+  const corPorErros = (n) => FAIXAS_ERROS.find((f) => n <= f.ate).cor;
+
+  // por região: com controlador à vista (lista) e quantos têm falha (todos os controladores da região, sem filtro)
+  let regioesComPino = { subarea: new Set(), corredor: new Set() };
+  let errosPorRegiao = { subarea: new Map(), corredor: new Map() };
+  // v1: total de dispositivos por região (todos os que estão no mapa), mostrado no hover da subárea
+  let totalPorRegiao = { subarea: new Map(), corredor: new Map() };
+  function atualizarEstatisticasRegioes(lista) {
+    regioesComPino = { subarea: new Set(), corredor: new Set() };
+    errosPorRegiao = { subarea: new Map(), corredor: new Map() };
+    lista.forEach((eq) => {
+      if (eq.subareaId) regioesComPino.subarea.add(eq.subareaId);
+      if (eq.corredorId) regioesComPino.corredor.add(eq.corredorId);
+    });
+    totalPorRegiao = { subarea: new Map(), corredor: new Map() };
+    LiveState.getEquipamentos().forEach((eq) => {
+      if (noMapa(eq)) {
+        if (eq.subareaId) totalPorRegiao.subarea.set(eq.subareaId, (totalPorRegiao.subarea.get(eq.subareaId) || 0) + 1);
+        if (eq.corredorId) totalPorRegiao.corredor.set(eq.corredorId, (totalPorRegiao.corredor.get(eq.corredorId) || 0) + 1);
+      }
+      if (!noMapa(eq) || !temProblema(eq)) return;
+      if (eq.subareaId) errosPorRegiao.subarea.set(eq.subareaId, (errosPorRegiao.subarea.get(eq.subareaId) || 0) + 1);
+      if (eq.corredorId) errosPorRegiao.corredor.set(eq.corredorId, (errosPorRegiao.corredor.get(eq.corredorId) || 0) + 1);
+    });
+  }
+  const errosDaRegiao = (tipo, id) => errosPorRegiao[tipo].get(id) || 0;
 
   function assinaturaDasRegioes() {
     return [
       JSON.stringify(filtro.camadas),
+      filtro.modoAlertas + (semEstado ? "-sem-estado" : ""), // muda a cor das subáreas (cadastrada x escala de falhas)
       [...filtro.subareas].join(","),
       [...filtro.corredores].join(","),
       foco ? `${foco.tipo}:${foco.regiaoTipo || ""}:${foco.id}` : "",
       selecao ? `${selecao.tipo}:${selecao.id}` : "",
       SUBAREAS.map((s) => s.id + s.nome + s.poligono.length).join("|"),
       CORREDORES.map((c) => c.id + c.nome + c.linha.length).join("|"),
+      // o que cada região mostra: tem pino à vista? e quantas falhas (cor e tooltip)
+      SUBAREAS.map((s) => `${s.id}:${regioesComPino.subarea.has(s.id) ? 1 : 0}:${errosDaRegiao("subarea", s.id)}:${totalPorRegiao.subarea.get(s.id) || 0}`).join("|"),
+      CORREDORES.map((c) => `${c.id}:${regioesComPino.corredor.has(c.id) ? 1 : 0}:${errosDaRegiao("corredor", c.id)}`).join("|"),
     ].join("#");
   }
 
@@ -418,20 +605,32 @@ const CockpitMap = (() => {
       if (!filtro.camadas.subareas && !emFoco("subarea", s.id)) return;
       if (!filtro.subareas.has(s.id)) return;
       if (foco && foco.tipo === "regiao" && !(foco.regiaoTipo === "subarea" && foco.id === s.id)) return;
+      // sem controlador à vista, a área não aparece (na vista só de erros, área sem erro é ruído)
+      // v1: a área só some se não tem dispositivo nenhum; desligar "Dispositivos" no filtro não pode apagar as áreas
+      const temPino = semEstado ? totalPorRegiao.subarea.has(s.id) : regioesComPino.subarea.has(s.id);
+      if (!temPino && !emFoco("subarea", s.id)) return;
       const destacada = focoRegiaoId === s.id || (!!selecao && selecao.tipo === "subarea" && selecao.id === s.id);
-      // preenchimento leve da cor da área; hover e seleção só reforçam a mesma cor
-      const cor = corDaArea(s);
+      // a cor diz quantas falhas há na área: do mais claro ao mais escuro (FAIXAS_ERROS), em vez de uma cor por área
+      // v1 (sem estado): todas as subáreas com o mesmo peso visual, na cor cadastrada (corDaArea), sem escala de falhas
+      const erros = semEstado ? 0 : errosDaRegiao("subarea", s.id);
+      // modo "Todos": cor cadastrada. Nos modos com alertas a cor é só a escala de falhas; área sem falha fica cinza,
+      // para a cor cadastrada não competir com a escala
+      const cor = semEstado ? corDaArea(s) : erros ? corPorErros(erros) : "#9ca3af";
+      const preenche = erros ? 0.4 : 0.18;
       const poligono = L.polygon(s.poligono, {
         color: cor,
         weight: destacada ? 3 : 1.5,
-        opacity: destacada ? 1 : 0.8,
+        opacity: destacada ? 1 : 0.9,
         fillColor: cor,
-        fillOpacity: destacada ? 0.26 : 0.12,
+        fillOpacity: destacada ? preenche + 0.12 : preenche,
       });
       poligono
-        .bindTooltip(s.nome, { permanent: false, direction: "center", className: "map-region-tooltip" })
-        .on("mouseover", () => !destacada && poligono.setStyle({ weight: 2.5, fillOpacity: 0.2 }))
-        .on("mouseout", () => !destacada && poligono.setStyle({ weight: 1.5, fillOpacity: 0.12 }))
+        .bindTooltip(
+          `<strong>${s.nome}</strong><br>${totalPorRegiao.subarea.get(s.id) || 0} ${totalPorRegiao.subarea.get(s.id) === 1 ? "dispositivo" : "dispositivos"}` + // resumo de quantidade (v1, mantido nas demais)
+            (erros ? ` · ${erros} com falha` : ""),
+          { permanent: false, direction: "center", className: "map-region-tooltip" })
+        .on("mouseover", () => !destacada && poligono.setStyle({ weight: 2.5, fillOpacity: preenche + 0.1 }))
+        .on("mouseout", () => !destacada && poligono.setStyle({ weight: 1.5, fillOpacity: preenche }))
         .on("click", (ev) => {
           L.DomEvent.stopPropagation(ev);
           selecionarRegiao("subarea", s.id);
@@ -458,24 +657,33 @@ const CockpitMap = (() => {
       if (!filtro.camadas.corredores && !emFoco("corredor", c.id)) return;
       if (!filtro.corredores.has(c.id)) return;
       if (foco && foco.tipo === "regiao" && !(foco.regiaoTipo === "corredor" && foco.id === c.id)) return;
+      const temPinoCor = semEstado ? totalPorRegiao.corredor.has(c.id) : regioesComPino.corredor.has(c.id); // v1: ver acima
+      if (!temPinoCor && !emFoco("corredor", c.id)) return; // sem controlador à vista, não aparece
       const destacado = focoRegiaoId === c.id || (!!selecao && selecao.tipo === "corredor" && selecao.id === c.id);
+      const errosCor = semEstado ? 0 : errosDaRegiao("corredor", c.id);
       const aoClicar = (ev) => {
         L.DomEvent.stopPropagation(ev);
         selecionarRegiao("corredor", c.id);
         enquadrarRegiao("corredor", c.id);
       };
+      // v1: corredor em grafite, opaco e mais grosso, com contorno branco por baixo para se destacar tanto no mapa claro
+      // quanto no satélite (o azul fino anterior se perdia). Fora das cores de estado (vermelho/âmbar) e das subáreas.
+      // v2/v3 herdam o visual da v1; o corredor só muda de cor quando tem falha
+      const pesoBase = 4;
+      const opBase = 1;
+      L.polyline(c.linha, { color: "#fff", weight: destacado ? 8 : 7, opacity: 0.95, interactive: false }).addTo(layerRegioes);
       const linha = L.polyline(c.linha, {
-        color: destacado ? "var(--red)" : "#2f6fed",
-        weight: destacado ? 5 : 2.5,
-        opacity: destacado ? 0.9 : 0.55,
+        color: destacado ? "var(--red)" : errosCor ? corPorErros(errosCor) : "#1f2937",
+        weight: destacado ? 5 : pesoBase,
+        opacity: destacado ? 0.9 : opBase,
       })
-        .bindTooltip(c.nome, { permanent: false, className: "map-region-tooltip" })
+        .bindTooltip(errosCor ? `${c.nome} · ${errosCor} com falha` : c.nome, { permanent: false, className: "map-region-tooltip" })
         .addTo(layerRegioes);
       // 2,5px é difícil de acertar com o mouse: uma linha invisível e larga por cima faz a área de
       // clique e de hover (o destaque é aplicado na linha visível)
       L.polyline(c.linha, { weight: 18, opacity: 0 })
-        .on("mouseover", () => !destacado && linha.setStyle({ weight: 4.5, opacity: 0.9 }))
-        .on("mouseout", () => !destacado && linha.setStyle({ weight: 2.5, opacity: 0.55 }))
+        .on("mouseover", () => !destacado && linha.setStyle({ weight: 6, opacity: 1 }))
+        .on("mouseout", () => !destacado && linha.setStyle({ weight: pesoBase, opacity: opBase }))
         .on("click", aoClicar)
         .addTo(layerRegioes);
     });
@@ -544,6 +752,7 @@ const CockpitMap = (() => {
   function abrirMenuContexto(ev, itens) {
     L.DomEvent.preventDefault(ev.originalEvent); // sem o menu do navegador
     L.DomEvent.stopPropagation(ev); // controlador em cima de subárea: abre só o do controlador
+    if (!Versoes.tem("mapa.menu-contexto")) return; // v1/v2: tudo no menu é escrita no controlador
     fecharMenuContexto();
     const el = document.createElement("div");
     el.className = "map-ctx-menu";
@@ -611,6 +820,8 @@ const CockpitMap = (() => {
     document.addEventListener("mousedown", aoClicarFora, true);
     document.addEventListener("keydown", aoTeclarMenu, true);
     map.on("movestart zoomstart", fecharMenuContexto);
+    map.on("zoomend", aplicarEscalaPino);
+    aplicarEscalaPino();
     // Submenu controlado aqui, não por :hover/:focus-within no CSS: com CSS, o item focado
     // deixava um submenu aberto e o do mouse abria outro por cima. Só um aberto por vez.
     el.addEventListener("mouseover", (e) => {
@@ -633,33 +844,47 @@ const CockpitMap = (() => {
 
   function render() {
     if (!map) return;
+    aplicarModoAlertas();
     if (selecao && !selecaoExiste()) {
       selecao = null;
       aoSelecionar(null);
     }
+
+    const lista = LiveState.getEquipamentos().filter((eq) => {
+      if (foco && foco.tipo === "equipamento") return eq.id === foco.id;
+      if (foco && foco.tipo === "regiao") {
+        // região escolhida em um widget (lista de Regiões etc.): zoom nela e só o que tem problema (offline ou alarme)
+        const naRegiao = foco.regiaoTipo === "subarea" ? eq.subareaId === foco.id : eq.corredorId === foco.id;
+        return naRegiao && temProblema(eq);
+      }
+      return equipamentoVisivel(eq);
+    });
+
+    // Regiões: só desenha a que tem controlador à vista, e a cor vem de quantos controladores têm falha nela
+    // (ver corPorErros). Recalculado a cada render; só redesenha se algo disso mudou (assinatura).
+    atualizarEstatisticasRegioes(lista);
     const assinatura = assinaturaDasRegioes();
     if (assinatura !== assinaturaRegioes) {
       assinaturaRegioes = assinatura;
       desenharRegioes();
     }
 
-    const lista = LiveState.getEquipamentos().filter((eq) => {
-      if (foco && foco.tipo === "equipamento") return eq.id === foco.id;
-      if (foco && foco.tipo === "regiao") {
-        return foco.regiaoTipo === "subarea" ? eq.subareaId === foco.id : eq.corredorId === foco.id;
-      }
-      return equipamentoVisivel(eq);
-    });
-
     // Tela inicial de resolução: com ao menos um problema no que está visível, os saudáveis esmaecem
     // (continuam no mapa, dão contexto) e os problemas saltam. Sem problema nenhum, nada esmaece
     // (não haveria o que destacar, e o mapa não pode parecer vazio).
-    saudaveisEsmaecidos = lista.some(temProblema);
+    // Na visão padrão só aparece o que já chama atenção: não há saudável para esmaecer.
+    // Com recorte do Resumo só aparece o que foi escolhido: nada esmaece (o escolhido não pode ficar apagado).
+    saudaveisEsmaecidos = !semEstado && !baseAtiva() && !resumoAtivo() && !regiaoSoFalha && lista.some(temProblema);
 
     // Agrupamentos só contêm controladores saudáveis (os com problema ficam soltos), então esmaecem junto
     map.getContainer().classList.toggle("map-esmaece-saudaveis", saudaveisEsmaecidos);
+    // equipamento selecionado: ele cresce e todos os outros pinos esmaecem (CSS .map-tem-selecao)
+    map.getContainer().classList.toggle("map-tem-selecao", !!selecao && selecao.tipo === "equipamento");
 
     sincronizarMarcadores(lista);
+    // Visão padrão sem nenhum dispositivo: avisa, para o mapa vazio não parecer defeito (é uma boa notícia)
+    const vazio = map.getContainer().parentElement && map.getContainer().parentElement.querySelector(".map-vazio");
+    if (vazio) vazio.hidden = !(filtro.soProblemas && lista.length === 0);
 
     onFiltroChange({
       contagens: getContagens(),
@@ -671,6 +896,7 @@ const CockpitMap = (() => {
         statusAlerta: filtro.statusAlerta,
         statusConexao: filtro.statusConexao,
         soProblemas: filtro.soProblemas,
+        modoAlertas: filtro.modoAlertas,
         camadas: { ...filtro.camadas },
       },
     });
@@ -697,6 +923,7 @@ const CockpitMap = (() => {
   function selecionarEquipamento(id, { centralizar = false } = {}) {
     const eq = LiveState.equipamentoPorId(id);
     if (!eq || !map) return;
+    if (!Versoes.tem("mapa.selecao")) return; // v1: clicar no pino não abre painel nem esmaece os outros
     selecao = { tipo: "equipamento", id };
     if (centralizar) {
       // centro do mapa fica à direita do pin: o pin cai no meio da parte livre, à esquerda do painel
@@ -712,6 +939,7 @@ const CockpitMap = (() => {
 
   function selecionarRegiao(regiaoTipo, id) {
     if (!map) return;
+    if (!Versoes.tem("mapa.selecao")) return; // v1: clicar na subárea/corredor também não abre painel
     // escolhida pela lista, a região precisa estar desenhada: se o filtro a escondia, liga
     (regiaoTipo === "subarea" ? filtro.subareas : filtro.corredores).add(id);
     selecao = { tipo: regiaoTipo, id };
@@ -745,13 +973,44 @@ const CockpitMap = (() => {
   // deixa a folga dele à direita. Não chamar a cada tick de tempo real (mexeria no mapa à toa).
   function enquadrarVisiveis() {
     if (!map) return;
-    const pts = LiveState.getEquipamentos().filter(equipamentoVisivel).map((e) => [e.lat, e.lng]);
+    if (semEstado) return centralizarV1();
+    const pts = semDistantes(LiveState.getEquipamentos().filter(equipamentoVisivel).map((e) => [e.lat, e.lng])); // ignora ponto muito distante, como na v1
     if (filtro.subareas.size < SUBAREAS.length) SUBAREAS.filter((s) => filtro.subareas.has(s.id)).forEach((s) => pts.push(...s.poligono));
     if (filtro.corredores.size < CORREDORES.length) CORREDORES.filter((c) => filtro.corredores.has(c.id)).forEach((c) => pts.push(...c.linha));
     if (!pts.length) return;
     const direita = selecao ? larguraPainel() + 40 : 40;
     if (pts.length === 1) { map.setView(pts[0], 17, { animate: true }); return; }
     map.fitBounds(L.latLngBounds(pts), { paddingTopLeft: [40, 60], paddingBottomRight: [direita, 40], maxZoom: 17, animate: true });
+  }
+
+  // Tira da conta do enquadramento os pontos MUITO longe do resto (um controlador a 26 km abria o zoom para o estado
+  // inteiro). Regra: distância até o centro (mediana) maior que Q3 + 3×(Q3−Q1) das distâncias. Com o banco atual
+  // (~1090 controladores) isso corta só o 293108 (Rodovia do Café, 26 km) e mantém o grupo do sul a ~16 km. O ponto
+  // continua no mapa; só não "puxa" o Centralizar. Com menos de 10 pontos não corta nada.
+  function semDistantes(pts) {
+    if (pts.length < 10) return pts;
+    const mediana = (v) => [...v].sort((a, b) => a - b)[Math.floor(v.length / 2)];
+    const centro = L.latLng(mediana(pts.map((p) => p[0])), mediana(pts.map((p) => p[1])));
+    const dist = pts.map((p) => centro.distanceTo(L.latLng(p)));
+    const ord = [...dist].sort((a, b) => a - b);
+    const q1 = ord[Math.floor(ord.length * 0.25)];
+    const q3 = ord[Math.floor(ord.length * 0.75)];
+    const limite = q3 + 3 * (q3 - q1);
+    return pts.filter((_, i) => dist[i] <= limite);
+  }
+
+  // v1: "Centralizar" enquadra tudo o que está LIGADO no filtro (dispositivos, subáreas, corredores), com folga igual
+  // dos quatro lados (a de cima é maior só para a busca e o botão Filtros, que ficam sobre o mapa). Recalcula o tamanho
+  // do mapa antes, para o cálculo valer depois de redimensionar o card. Nada ligado = volta à visão inicial de Curitiba.
+  function centralizarV1() {
+    map.invalidateSize();
+    const pts = [];
+    if (filtro.camadas.controladores) pts.push(...semDistantes(LiveState.getEquipamentos().filter(equipamentoVisivel).map((e) => [e.lat, e.lng])));
+    if (filtro.camadas.subareas) SUBAREAS.filter((s) => totalPorRegiao.subarea.has(s.id)).forEach((s) => pts.push(...s.poligono));
+    if (filtro.camadas.corredores) CORREDORES.filter((c) => totalPorRegiao.corredor.has(c.id)).forEach((c) => pts.push(...c.linha));
+    if (!pts.length) { map.setView(CENTRO_CURITIBA, 13, { animate: true }); return; }
+    if (pts.length === 1) { map.setView(pts[0], 17, { animate: true }); return; }
+    map.fitBounds(L.latLngBounds(pts), { paddingTopLeft: [40, 64], paddingBottomRight: [40, 40], maxZoom: 17, animate: true });
   }
 
   function enquadrarSelecao() {
@@ -796,7 +1055,8 @@ const CockpitMap = (() => {
 
   // Chamado quando regiões são cadastradas/excluídas: aplica a lista já reconciliada
   // (app.js) sem mexer nos demais filtros, e larga o foco se a região dele sumiu.
-  function setFiltroRegioes(subareasIds, corredoresIds) {
+  function setFiltroRegioes(subareasIds, corredoresIds, opcoes) {
+    regiaoSoFalha = !!(opcoes && opcoes.soComFalha);
     filtro.subareas = new Set(subareasIds);
     filtro.corredores = new Set(corredoresIds);
     if (foco && foco.tipo === "regiao") {
@@ -807,10 +1067,12 @@ const CockpitMap = (() => {
   }
 
   function toggleSubarea(id) {
+    regiaoSoFalha = false;
     filtro.subareas.has(id) ? filtro.subareas.delete(id) : filtro.subareas.add(id);
     render();
   }
   function toggleCorredor(id) {
+    regiaoSoFalha = false;
     filtro.corredores.has(id) ? filtro.corredores.delete(id) : filtro.corredores.add(id);
     render();
   }
@@ -819,6 +1081,7 @@ const CockpitMap = (() => {
     render();
   }
   function setTodas(campo, valor) {
+    regiaoSoFalha = false;
     const ids =
       campo === "subareas"
         ? SUBAREAS.map((s) => s.id)
@@ -836,8 +1099,14 @@ const CockpitMap = (() => {
     filtro.camadas[nome] = !!ligada;
     render();
   }
-  function setSoProblemas(valor) {
-    filtro.soProblemas = !!valor;
+  function setModoAlertas(modo) {
+    if (!["todos", "todos-alertas", "so-alertas"].includes(modo)) return;
+    filtro.modoAlertas = modo;
+    render();
+  }
+  const setSoProblemas = (valor) => setModoAlertas(valor ? "so-alertas" : "todos"); // compatibilidade
+  function setTiposGlobais(ids) {
+    tiposGlobais = new Set(ids);
     render();
   }
   function setStatusConexao(valor) {
@@ -852,6 +1121,7 @@ const CockpitMap = (() => {
   // de Mapa" das histórias #125168/#125169/#128628).
   function setFiltroCompleto(payload) {
     foco = null;
+    regiaoSoFalha = false;
     if (payload.tipos) filtro.categorias = new Set(payload.tipos);
     if (payload.regioes) {
       filtro.subareas = new Set(payload.regioes.filter((id) => SUBAREAS.some((s) => s.id === id)));
@@ -859,7 +1129,7 @@ const CockpitMap = (() => {
     }
     filtro.statusConexao = payload.statusConexao || "todos";
     filtro.statusAlerta = payload.statusAlerta || "todos";
-    filtro.soProblemas = false;
+    recorteDeCard = true; // o card manda: o recorte dele (tipos/regiões/status) é o que se vê, sem a visão padrão por cima
     render();
   }
 
@@ -876,6 +1146,33 @@ const CockpitMap = (() => {
   }
   function getFiltroIds() {
     return filtroIds ? new Set(filtroIds) : null;
+  }
+  // O que está recortando o mapa agora (alimenta a tag "Filtrando: ..."). visaoPadrao = só alarme ou modo operador.
+  function getRecorte() {
+    return {
+      visaoPadrao: baseAtiva(),
+      recorteDeCard,
+      resumo: { ...filtroResumo },
+      ids: filtroIds ? filtroIds.size : 0,
+      statusConexao: filtro.statusConexao,
+      statusAlerta: filtro.statusAlerta,
+      regiaoSoFalha,
+      subareas: [filtro.subareas.size, SUBAREAS.length],
+      corredores: [filtro.corredores.size, CORREDORES.length],
+    };
+  }
+  // "×" da tag: tira todos os recortes (o toggle "Somente alertas" continua como o operador deixou)
+  function limparRecortes() {
+    regiaoSoFalha = false;
+    recorteDeCard = false;
+    filtroResumo = { modo: null, status: null, estado: null };
+    filtroIds = null;
+    filtro.statusConexao = "todos";
+    filtro.statusAlerta = "todos";
+    filtro.subareas = new Set(SUBAREAS.map((s) => s.id));
+    filtro.corredores = new Set(CORREDORES.map((c) => c.id));
+    filtro.categorias = new Set(CATEGORIAS_EQUIPAMENTO.map((c) => c.id));
+    render();
   }
   function getFiltroResumo() {
     return { ...filtroResumo };
@@ -963,10 +1260,14 @@ const CockpitMap = (() => {
     getFiltroResumo,
     setFiltroIds,
     getFiltroIds,
+    getRecorte,
+    limparRecortes,
     toggleOcultoResumo,
     getOcultosResumo,
     setStatusConexao,
+    setTiposGlobais,
     setSoProblemas,
+    setModoAlertas,
     setCamada,
     setMapaBase,
     mapaBaseAtual,
@@ -976,5 +1277,6 @@ const CockpitMap = (() => {
     limparFoco,
     buscar,
     corDaArea,
+    corPorErros,
   };
 })();
