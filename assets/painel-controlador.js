@@ -23,14 +23,14 @@ const PainelControlador = (() => {
   function abas(eq) {
     const n = LiveState.alertasDoEquipamento(eq.id).length;
     return [
-      { id: "geral", label: "Geral" },
-      { id: "plano", label: "Plano" },
-      { id: "alertas", label: `Alertas${n ? ` <span class="sel-aba-n">${n}</span>` : ""}` },
-      { id: "comandos", label: "Comandos" },
+      { id: "geral", label: "Geral", recurso: "painel.geral" },
+      { id: "plano", label: "Plano", recurso: "painel.plano" },
+      { id: "alertas", label: `Alertas${n ? ` <span class="sel-aba-n">${n}</span>` : ""}`, recurso: "painel.alertas" },
+      { id: "comandos", label: "Comandos", recurso: "painel.comandos" },
       // Grupos fora por enquanto (pedido do Guery, 23/09). O conteúdo (gruposMarkup) continua
       // aqui — é só descomentar para voltar.
       // { id: "grupos", label: "Grupos" },
-    ];
+    ].filter((a) => Versoes.tem(a.recurso)); // versoes.js: a aba só existe nas versões que a incluem
   }
 
   // `grupo`: "executar" = age sobre o controlador; sem grupo = só consulta. `confirmar`: pede um segundo
@@ -884,7 +884,7 @@ const PainelControlador = (() => {
   // (sem lista, abas nem coordenação). "Ver plano completo" volta ao modal inteiro.
   function abrirAjuste(eqId) {
     const eq = LiveState.equipamentoPorId(eqId);
-    if (!eq) return;
+    if (!eq || !Versoes.tem("plano.ajuste")) return;
     if (!eq.online) return toast("Controlador offline: o ajuste de tempos não chegaria até ele.");
     const num = faixaAgora()[2];
     const p = planoEfetivo(eqId, num);
@@ -910,7 +910,7 @@ const PainelControlador = (() => {
       return `<div>
           <div class="plano-h-linha">
             <h5 class="plano-modal-h">Estágios</h5>
-            <button type="button" class="btn-secondary plano-ajustar-btn" data-ajuste="abrir" ${pode ? "" : `disabled title="${motivo}"`}>Ajustar tempos</button>
+            ${Versoes.tem("plano.ajuste") ? `<button type="button" class="btn-secondary plano-ajustar-btn" data-ajuste="abrir" ${pode ? "" : `disabled title="${motivo}"`}>Ajustar tempos</button>` : ""}
           </div>
           <div class="plano-estagios">${p.est.map((d, i) => `<div class="plano-estagio"><span>E${i + 1}</span><strong>${d}s</strong></div>`).join("")}</div>
           ${p.ajustado ? `<p class="plano-ajuste-nota">Ajustado às ${p.ajustado.hora} · antes: ${PLANOS_EXEMPLO[p.num].est.map((d, i) => `E${i + 1} ${d}s`).join(", ")} <button type="button" class="btn-text" data-ajuste="voltar">Desfazer</button></p>` : ""}

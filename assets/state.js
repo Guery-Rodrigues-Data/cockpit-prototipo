@@ -36,7 +36,13 @@ const LiveState = (() => {
   // `modoOperador`, senão Centro/Local pela seleção de plano; o dado real vem da tabela de
   // programação). Proporções da captura do legado: Local 47%, Centro 53%. Operador foi 0% na
   // captura; deixei ~1% só pra o destaque no mapa poder ser visto — NÃO é número de produção.
+  // v3 (widget Notificações): controladores que entraram/saíram do modo Operador durante a simulação. Sobrepõe o modo
+  // sorteado abaixo; vazio nas demais versões (a simulação de modo só roda quando a versão tem o widget).
+  const modosSimulados = new Map();
   function modoDoControlador(id) {
+    // Modo de controle (Operador/Local/Centro) só entra na v3: hoje só se sabe dos ALERTAS dos controladores. Antes disso, tudo é "centro" (neutro).
+    if (typeof Versoes !== "undefined" && !Versoes.tem("modo-controle")) return "centro";
+    if (modosSimulados.has(id)) return modosSimulados.get(id);
     let h = 0;
     for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
     const n = h % 100;
@@ -96,6 +102,41 @@ const LiveState = (() => {
     return { min: Math.round(n * PROBLEMAS_FRACAO_MIN), max: Math.round(n * PROBLEMAS_FRACAO_MAX) };
   }
 
+  /* ---------- registro de eventos (widget Notificações, v3) ----------
+     MOCK — HIPÓTESE NÃO VALIDADA: o feed é o que a simulação faz a cada tick (alarme abriu, alarme encerrou, ficou offline,
+     voltou, entrou/saiu do modo Operador). No sistema real viria do histórico de eventos (o catálogo tem "Reset",
+     "Controle Manual", "Log In"...). Só registra durante o tick: a cena inicial e o slide do admin não inundam o feed. */
+  // MOCK — HIPÓTESE NÃO VALIDADA: e-mails de exemplo; no sistema real o autor vem do registro de auditoria do evento.
+  const USUARIOS_EXEMPLO = ["ana.souza@exemplo.com.br", "carlos.lima@exemplo.com.br", "marina.alves@exemplo.com.br", "paulo.reis@exemplo.com.br"];
+  const eventos = [];
+  const EVENTOS_MAX = 200;
+  let registrando = false;
+  // Regra do feed: só notificações do dia (desde 00:00 do horário local). A virada do dia tira o que ficou para trás.
+  // HIPÓTESE NÃO VALIDADA: "dia" = dia civil, não turno do operador (quem vira a noite perde o que aconteceu antes da meia-noite).
+  function inicioDoDia() { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); }
+  function eventosDeHoje() {
+    const ini = inicioDoDia();
+    const i = eventos.findIndex((e) => e.ts < ini); // lista da mais nova para a mais antiga
+    if (i >= 0) eventos.length = i;
+    return eventos;
+  }
+  function registrar(tipo, equipamentoId, texto, severidade, autor) {
+    if (!registrando) return;
+    const eq = equipamentoPorId(equipamentoId);
+    eventos.unshift({
+      id: `EV-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      ts: Date.now(),
+      tipo, // "alarme" | "offline" | "operador" | "plano" | "tabela"
+      autor: autor || "Sistema", // quem causou: "Sistema" ou um usuário (nomes de exemplo, ver USUARIOS_EXEMPLO)
+      equipamentoId,
+      nome: eq ? eq.nome : equipamentoId,
+      texto,
+      severidade: severidade || null,
+    });
+    eventosDeHoje();
+    if (eventos.length > EVENTOS_MAX) eventos.length = EVENTOS_MAX;
+  }
+
   function novoAlerta(equipamentoId, tipoAlarme) {
     const info = ALARMES_CATALOGO[tipoAlarme];
     return {
@@ -120,8 +161,11 @@ const LiveState = (() => {
       // guarda o momento em que deixou de comunicar (a aba Geral mostra como "Última comunicação")
       atualizarEquipamento(alvo.id, { online: false, ultimaComunicacao: Date.now() });
       alertas = [novoAlerta(alvo.id, "comunicacao"), ...alertas];
+      registrar("offline", alvo.id, "Deixou de comunicar", "Alto", "Sistema");
     } else {
-      alertas = [novoAlerta(alvo.id, sortearAlarme()), ...alertas];
+      const alerta = novoAlerta(alvo.id, sortearAlarme());
+      alertas = [alerta, ...alertas];
+      registrar("alarme", alvo.id, ALARMES_CATALOGO[alerta.tipoAlarme].nome, alerta.severidade);
     }
   }
 
@@ -134,6 +178,39 @@ const LiveState = (() => {
     alertas = alertas.filter((a) => a.equipamentoId !== alvo.id);
   }
 
+  // v3: de vez em quando um controlador entra ou sai do modo Operador (alguém assumiu o controle manual).
+  // v3: o controlador mudou de plano (pela grade horária, "Sistema", ou manualmente por alguém) ou alguém mudou a tabela de
+  // programação. Só registra o evento; não muda nenhum dado do protótipo. Números de plano de exemplo.
+  // HIPÓTESE NÃO VALIDADA: se o legado/Antares registra a troca de plano e quem editou a tabela.
+  function mudarPlano() {
+    const alvo = sortear(equipamentos.filter(ehControlador));
+    if (!alvo) return;
+    const de = 1 + Math.floor(Math.random() * 8);
+    const para = ((de + Math.floor(Math.random() * 7)) % 8) + 1;
+    const porGrade = Math.random() < 0.7; // a maioria das trocas é automática, pela grade horária
+    registrar("plano", alvo.id, `Mudou do plano ${de} para o plano ${para}`, null, porGrade ? "Sistema" : sortear(USUARIOS_EXEMPLO));
+  }
+  function mudarTabela() {
+    const alvo = sortear(equipamentos.filter(ehControlador));
+    if (!alvo) return;
+    registrar("tabela", alvo.id, "Mudou a tabela de programação", null, sortear(USUARIOS_EXEMPLO));
+  }
+
+  function alternarModoOperador() {
+    const controladores = equipamentos.filter(ehControlador);
+    if (!controladores.length) return;
+    const emOperador = controladores.filter((e) => modoDoControlador(e.id) === "operador");
+    if (emOperador.length && Math.random() < 0.5) {
+      const alvo = sortear(emOperador);
+      modosSimulados.set(alvo.id, "centro");
+    } else {
+      const alvo = sortear(controladores.filter((e) => modoDoControlador(e.id) !== "operador"));
+      if (!alvo) return;
+      modosSimulados.set(alvo.id, "operador");
+      registrar("operador", alvo.id, "Entrou no modo Operador", null, sortear(USUARIOS_EXEMPLO));
+    }
+  }
+
   // Cena inicial: sai já com um número de problemas dentro da faixa, sem esperar os ticks.
   function semearProblemas() {
     const { min, max } = faixaProblemas();
@@ -143,14 +220,99 @@ const LiveState = (() => {
     while (controladoresComProblema().length < alvo && guarda--) abrirProblema();
   }
 
+  /* ---------- número fixo de falhas (modo admin: slide "Simular falhas") ----------
+     O admin escolhe quantos controladores estão com falha (offline ou alarme) e a simulação SEGURA esse número:
+     o tick não mexe mais. Alarmes que já vêm fixos nos dados de exemplo (que não são "ao vivo") não fecham, então
+     o mínimo pode não ser zero. Voltar ao automático: voltarSimulacao(). */
+  let alvoManual = null;
+
+  function definirProblemas(n) {
+    if (falhasReais) return;
+    const total = equipamentos.filter(ehControlador).length;
+    alvoManual = Math.max(0, Math.min(total, Math.round(n)));
+    let guarda = 5000;
+    while (controladoresComProblema().length > alvoManual && guarda--) fecharProblema();
+    guarda = 5000;
+    while (controladoresComProblema().length < alvoManual && guarda--) abrirProblema();
+    notify();
+  }
+  function voltarSimulacao() {
+    alvoManual = null;
+    semearProblemas();
+    notify();
+  }
+  const contagemProblemas = () => ({ atual: controladoresComProblema().length, total: equipamentos.filter(ehControlador).length, manual: alvoManual });
+
   function tick() {
-    if (!equipamentos.some(ehControlador)) return;
+    if (falhasReais || alvoManual !== null || !equipamentos.some(ehControlador)) return;
     const n = controladoresComProblema().length;
     const { min, max } = faixaProblemas();
+    registrando = true;
     if (n < min) abrirProblema();
     else if (n > max) fecharProblema();
     else if (n === min || (n < max && Math.random() < 0.5)) abrirProblema();
     else fecharProblema();
+    // só nas versões com o widget Notificações: a mudança de modo altera o que "Só alertas" mostra no mapa
+    if (typeof Versoes !== "undefined" && Versoes.tem("widget.notificacoes") && Math.random() < 0.3) alternarModoOperador();
+    if (typeof Versoes !== "undefined" && Versoes.tem("widget.notificacoes") && Math.random() < 0.2) mudarPlano();
+    if (typeof Versoes !== "undefined" && Versoes.tem("widget.notificacoes") && Math.random() < 0.08) mudarTabela();
+    registrando = false;
+    notify();
+  }
+
+  /* ---------- falhas reais (modo admin) ----------
+     O admin busca os eventos de dispositivos-eventos (API do Antares dev) e chama isto: as falhas
+     simuladas saem, as reais entram e a simulação PARA (senão o tick reabriria problemas por cima).
+     Associação evento -> controlador é HIPÓTESE NÃO VALIDADA: o `comunicacaoId` da API ("010103")
+     não é o id do Supabase ("112962"). Casa por id quando bate; senão sorteia um controlador (e o
+     admin avisa quantos foram sorteados). Voltar à simulação: limparFalhasReais(). */
+  let falhasReais = false;
+
+  function aplicarFalhasReais(eventos) {
+    const controladores = equipamentos.filter(ehControlador);
+    const porId = new Map(controladores.map((e) => [e.id, e]));
+    const usados = new Set();
+    const livres = () => controladores.filter((e) => !usados.has(e.id));
+    let sorteados = 0;
+
+    alvoManual = null; // as falhas reais entram no lugar do número escolhido no slide
+    alertas = alertas.filter((a) => !a.id.startsWith("ALR-LIVE") && !a.id.startsWith("ALR-API"));
+    equipamentos = equipamentos.map((e) => (ehControlador(e) && !e.online ? { ...e, online: true } : e));
+
+    const novos = [];
+    for (const ev of eventos) {
+      let alvo = porId.get(String(ev.comunicacaoId));
+      if (!alvo || usados.has(alvo.id)) {
+        const pool = livres();
+        if (!pool.length) break;
+        alvo = sortear(pool);
+        sorteados++;
+      }
+      usados.add(alvo.id);
+      const info = ALARMES_CATALOGO[ev.identificador] || ALARMES_CATALOGO.desconhecido;
+      const d = new Date(ev.dataAlerta);
+      novos.push({
+        id: `ALR-API-${ev.id}`,
+        equipamentoId: alvo.id,
+        endereco: alvo.nome, // a API ainda não cadastra endereço: vale o do controlador onde o evento caiu
+        tipoAlarme: ALARMES_CATALOGO[ev.identificador] ? ev.identificador : "desconhecido",
+        descricao: ev.descricaoAlerta || info.descricao,
+        severidade: SEVERIDADE_DO_CATALOGO[ev.criticidade] || "Médio",
+        dataHora: isNaN(d) ? "" : d.toLocaleDateString("pt-BR") + " " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+      });
+      if (ev.identificador === "comunicacao") atualizarEquipamento(alvo.id, { online: false, ultimaComunicacao: isNaN(d) ? Date.now() : d.getTime() });
+    }
+    alertas = [...novos, ...alertas];
+    falhasReais = true;
+    notify();
+    return { aplicados: novos.length, sorteados };
+  }
+
+  function limparFalhasReais() {
+    alertas = alertas.filter((a) => !a.id.startsWith("ALR-API"));
+    equipamentos = equipamentos.map((e) => (ehControlador(e) && !e.online ? { ...e, online: true } : e));
+    falhasReais = false;
+    semearProblemas();
     notify();
   }
 
@@ -177,12 +339,19 @@ const LiveState = (() => {
     notificar: notify,
     getEquipamentos,
     getAlertas,
+    getEventos: eventosDeHoje,
     equipamentoPorId,
     alertasDoEquipamento,
     modoDoControlador,
     statusDoControlador,
     ROTULOS_STATUS,
     substituirEquipamentosDoTipo,
+    aplicarFalhasReais,
+    limparFalhasReais,
+    falhasReaisAtivas: () => falhasReais,
+    definirProblemas,
+    voltarSimulacao,
+    contagemProblemas,
     start,
   };
 })();

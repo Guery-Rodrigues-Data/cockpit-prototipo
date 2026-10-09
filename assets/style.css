@@ -634,7 +634,7 @@ a { color: inherit; }
 /* Hierarquia: dispositivo saudável é só um ponto discreto; com problema ganha o pin com ícone. */
 .map-dot {
   width: 14px; height: 14px; border-radius: 50%; background: var(--green); border: 2px solid #fff;
-  box-shadow: 0 0 0 1px rgba(31, 157, 92, 0.35); opacity: 0.85; transition: transform 0.12s ease;
+  box-shadow: 0 0 0 1px rgba(31, 157, 92, 0.35); opacity: 1; transition: transform 0.12s ease;
 }
 .map-dot:hover { opacity: 1; transform: scale(1.35); }
 .map-dot.is-selecionado { opacity: 1; transform: scale(1.7); box-shadow: 0 0 0 4px rgba(224, 52, 43, 0.35); }
@@ -647,9 +647,9 @@ a { color: inherit; }
 .map-eq-pin.is-selecionado { transform: scale(1.2); box-shadow: 0 0 0 4px rgba(224, 52, 43, 0.3), var(--shadow-md); }
 
 /* Pino do controlador (ícone da pasta Icones) + bolinha de estado no canto superior direito */
-.map-ctrl-pin { position: relative; width: 24px; height: 28px; filter: drop-shadow(0 2px 3px rgba(22, 26, 32, 0.3)); transform-origin: 50% 100%; transition: transform 0.12s ease; }
+.map-ctrl-pin { position: relative; width: 24px; height: 28px; filter: drop-shadow(0 2px 3px rgba(22, 26, 32, 0.3)); transform-origin: 50% 100%; transition: transform 0.12s ease; transform: scale(var(--pin-escala, 1)); }
 .map-ctrl-pin svg { display: block; }
-.map-ctrl-pin:hover { transform: scale(1.15); }
+.map-ctrl-pin:hover { transform: scale(calc(var(--pin-escala, 1) * 1.15)); }
 .map-ctrl-pin::after {
   content: ""; position: absolute; top: -4px; right: -4px; width: 10px; height: 10px; border-radius: 50%;
   border: 2px solid #fff; display: none;
@@ -659,7 +659,7 @@ a { color: inherit; }
 .map-ctrl-pin.is-selecionado { transform: scale(1.3); filter: drop-shadow(0 0 0 #fff) drop-shadow(0 0 6px rgba(224, 52, 43, 0.75)); }
 /* com algum problema visível, os saudáveis esmaecem em todo o mapa (ver map.js, esmaece).
    0.35 e não mais baixo: eles ainda precisam dar contexto (onde o problema está na rede) */
-.map-ctrl-pin.is-esmaecido { opacity: 0.35; filter: none; }
+.map-ctrl-pin.is-esmaecido { opacity: 0.6; filter: none; }
 .map-ctrl-pin.is-esmaecido:hover, .map-ctrl-pin.is-esmaecido.is-selecionado { opacity: 1; }
 :root { --modo-operador: #4432fc; /* azul-violeta do legado (print do filtro, 29/09) */ }
 /* modo Operador: bolinha azul no canto esquerdo (a do estado, vermelha/âmbar, fica no direito) */
@@ -667,15 +667,17 @@ a { color: inherit; }
   content: ""; position: absolute; top: -4px; left: -4px; width: 10px; height: 10px; border-radius: 50%;
   border: 2px solid #fff; background: var(--modo-operador); z-index: 1;
 }
-.map-esmaece-saudaveis .map-cluster { opacity: 0.35; transition: opacity 0.12s ease; }
-.map-esmaece-saudaveis .map-cluster:hover { opacity: 0.6; }
+.map-esmaece-saudaveis .map-cluster { opacity: 0.6; transition: opacity 0.12s ease; }
+.map-esmaece-saudaveis .map-cluster:hover { opacity: 0.9; }
 
-/* Agrupamento: só controladores saudáveis, sempre neutro (os com problema ficam soltos no mapa). */
+/* Agrupamento: neutro (só saudáveis, vista mista) ou com a cor do pior estado de dentro (vista só de problemas). */
 .map-cluster {
   width: 32px; height: 32px; border-radius: 50%; background: #fff; color: var(--ink-muted); border: 2px solid var(--border-strong);
   display: flex; align-items: center; justify-content: center; position: relative;
   font-family: var(--font-body); font-size: 11.5px; font-weight: 700; box-shadow: var(--shadow-sm);
 }
+.map-cluster.is-offline { background: var(--red); border-color: #fff; color: #fff; }
+.map-cluster.is-alerta { background: var(--amber); border-color: #fff; color: #1f2933; }
 
 /* Só problemas: liga/desliga no topo do mapa, com a contagem viva de quantos existem. */
 /* Camadas do mapa: lista de caixas de marcar, cada uma com amostra de como aparece no mapa */
@@ -1695,3 +1697,259 @@ a { color: inherit; }
 .sel-tipo strong { font-size: 12.5px; color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
 .sel-tipo em { font-style: normal; font-size: 10.5px; font-weight: 600; color: var(--red); white-space: nowrap; }
 .sel-tipo.tem-offline { border-color: var(--red-tint); }
+
+/* mapa na visão padrão (só alerta ou modo operador) sem nenhum dispositivo: aviso discreto no centro */
+.map-vazio { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 500; max-width: 80%; padding: 10px 16px; border-radius: 10px; background: rgba(255, 255, 255, 0.94); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12); font-size: 13px; color: var(--text-secondary, #5b6472); text-align: center; pointer-events: none; }
+.map-vazio[hidden] { display: none; }
+
+/* Resumo: "Geral" e uma seção por tipo com estado próprio (títulos fixos, sem recolher) */
+.resumo-secao + .resumo-secao { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 2px; }
+.resumo-secao-head { padding: 8px 4px 2px; font-weight: 700; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-secondary, #5b6472); }
+.resumo-secao-head em { margin-left: 4px; font-style: normal; font-weight: 600; opacity: 0.7; }
+
+/* tag do mapa: só aparece quando há filtro ativo; centralizada, na parte superior */
+.map-filtro-tag { position: absolute; top: 56px; left: 50%; transform: translateX(-50%); z-index: 1000; width: max-content; display: inline-flex; align-items: center; gap: 8px; max-width: calc(100% - 20px); padding: 4px 6px 4px 12px; border-radius: 999px; background: var(--surface, #fff); border: 1px solid var(--border); box-shadow: 0 1px 6px rgba(0, 0, 0, 0.1); font-size: 12px; color: var(--text-secondary, #5b6472); }
+.map-filtro-tag[hidden] { display: none; }
+.map-filtro-tag b { font-weight: 700; color: var(--text, #1f2933); }
+.map-filtro-tag button { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; }
+.map-filtro-tag button:hover { background: var(--surface-sunken, #eef0f3); }
+.map-filtro-tag button svg { width: 12px; height: 12px; }
+
+/* Filtro geral da tela (botão "Filtros" na barra do cockpit) */
+.cockpit-toolbar-acoes { display: flex; align-items: center; gap: 10px; }
+.filtro-geral-wrap { position: relative; }
+.cockpit-toolbar .btn-secondary { padding: 8px 14px; font-size: 13px; }
+.filtro-geral-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; margin-left: 6px; padding: 0 5px; border-radius: 99px; background: var(--red); color: #fff; font-size: 11px; font-weight: 700; }
+.filtro-geral-badge[hidden] { display: none; }
+.filtro-geral-pop { position: absolute; top: calc(100% + 10px); right: 0; width: 300px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); z-index: 950; display: none; }
+.filtro-geral-pop.is-open { display: block; }
+.fg-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
+.fg-link { border: 0; background: none; padding: 0; font-size: 12px; font-weight: 600; color: var(--red); cursor: pointer; }
+.fg-grupo { margin-bottom: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-faint); }
+.fg-lista { display: flex; flex-direction: column; }
+.fg-check { display: flex; align-items: center; gap: 10px; padding: 7px 6px; margin: 0 -6px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; color: var(--ink); cursor: pointer; }
+.fg-check:hover { background: var(--surface-sunken); }
+.fg-check input { margin: 0; accent-color: var(--red); }
+.fg-ico { display: inline-flex; width: 18px; height: 18px; color: var(--ink-muted); }
+.fg-ico svg { width: 100%; height: 100%; }
+.fg-nota { margin: 10px 0 0; font-size: 11px; line-height: 1.4; color: var(--ink-faint); }
+
+/* Equipamento selecionado no mapa: cresce mais e o resto fica bem mais claro (continua visível, só dá contexto).
+   Mais específico que .is-esmaecido (0.6) para valer também quando os saudáveis já estão esmaecidos. */
+.map-tem-selecao .map-ctrl-pin:not(.is-selecionado),
+.map-tem-selecao .map-eq-pin:not(.is-selecionado),
+.map-tem-selecao .map-dot:not(.is-selecionado),
+.map-tem-selecao .map-cluster { opacity: 0.3; transition: opacity 0.15s ease, transform 0.12s ease; }
+.map-tem-selecao .map-ctrl-pin:not(.is-selecionado):hover,
+.map-tem-selecao .map-eq-pin:not(.is-selecionado):hover,
+.map-tem-selecao .map-dot:not(.is-selecionado):hover,
+.map-tem-selecao .map-cluster:hover { opacity: 0.85; }
+.map-ctrl-pin.is-selecionado { transform: scale(1.7); }
+.map-eq-pin.is-selecionado { transform: scale(1.5); }
+
+/* Toggle "Somente alertas" no topo do mapa (ao lado de Camadas) */
+.map-toggle {
+  display: flex; align-items: center; gap: 8px; border: 1px solid var(--border-strong); background: var(--surface);
+  border-radius: var(--radius-sm); padding: 6px 10px; font-size: 12px; font-weight: 600; color: var(--ink);
+  cursor: pointer; white-space: nowrap; box-shadow: var(--shadow-md);
+}
+.map-toggle:hover { background: var(--surface-sunken); }
+.map-toggle-trilho { position: relative; width: 28px; height: 16px; border-radius: 999px; background: #c4c4c4; flex: none; transition: background 0.15s ease; }
+.map-toggle-bolinha { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(22, 26, 32, 0.3); transition: transform 0.15s ease; }
+.map-toggle.is-on { border-color: var(--red); color: var(--red); background: var(--red-tint); }
+.map-toggle.is-on .map-toggle-trilho { background: var(--red); }
+.map-toggle.is-on .map-toggle-bolinha { transform: translateX(12px); }
+.map-toggle:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+
+/* ---------- Seletor de versão (v1 / v2 / v3) — ver assets/versoes.js ---------- */
+.submenu-item[hidden], .filtro-geral-wrap[hidden] { display: none !important; }
+.versao-wrap { position: relative; display: flex; align-items: center; gap: 6px; margin-right: 6px; }
+.versao-seg { display: inline-flex; padding: 2px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-md); }
+.versao-seg button { border: 0; background: transparent; padding: 6px 12px; border-radius: 8px; font: 600 13px var(--font-body); color: var(--ink-muted); cursor: pointer; }
+.versao-seg button:hover { color: var(--ink); }
+.versao-seg button.is-ativa { background: var(--btn-primary); color: #fff; }
+.versao-info { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--border-strong); background: var(--surface); color: var(--ink-muted); font: 700 12px var(--font-body); cursor: pointer; }
+.versao-info:hover { color: var(--ink); background: var(--surface-sunken); }
+.versao-pop { position: absolute; top: calc(100% + 10px); right: 0; width: 380px; max-height: 70vh; overflow: auto; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); z-index: 950; display: none; }
+.versao-pop.is-open { display: block; }
+.versao-pop-titulo { font: 600 14px var(--font-display); color: var(--ink); }
+.versao-pop-aviso { margin: 4px 0 8px; font-size: 12px; color: var(--amber); }
+.versao-pop-grupo { margin: 10px 0 4px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-faint); }
+.versao-pop-item { display: flex; align-items: baseline; gap: 8px; padding: 3px 0; font-size: 13px; color: var(--ink); }
+.versao-pop-item.is-fora { color: var(--ink-faint); }
+.versao-pop-tag { flex: 0 0 auto; min-width: 26px; text-align: center; padding: 1px 6px; border-radius: 99px; font-size: 11px; font-weight: 700; background: var(--blue-tint); color: var(--blue); }
+.versao-pop-tag { min-width: 32px; }
+.versao-pop-tag[data-v="2"] { background: var(--green-tint); color: var(--green); }
+.versao-pop-tag[data-v="3"] { background: var(--purple-tint); color: var(--purple); }
+.versao-pop-tag[data-v="4"] { background: var(--amber-tint); color: var(--amber); }
+/* ---------- Seletor de versão (v1 / v2 / v3) — ver assets/versoes.js ---------- */
+.submenu-item[hidden], .filtro-geral-wrap[hidden] { display: none !important; }
+.versao-wrap { position: relative; display: flex; align-items: center; gap: 6px; margin-right: 6px; }
+.versao-seg { display: inline-flex; padding: 2px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-md); }
+.versao-seg button { border: 0; background: transparent; padding: 6px 12px; border-radius: 8px; font: 600 13px var(--font-body); color: var(--ink-muted); cursor: pointer; }
+.versao-seg button:hover { color: var(--ink); }
+.versao-seg button.is-ativa { background: var(--btn-primary); color: #fff; }
+.versao-info { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--border-strong); background: var(--surface); color: var(--ink-muted); font: 700 12px var(--font-body); cursor: pointer; }
+.versao-info:hover { color: var(--ink); background: var(--surface-sunken); }
+.versao-pop { position: absolute; top: calc(100% + 10px); right: 0; width: 380px; max-height: 70vh; overflow: auto; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); z-index: 950; display: none; }
+.versao-pop.is-open { display: block; }
+.versao-pop-titulo { font: 600 14px var(--font-display); color: var(--ink); }
+.versao-pop-aviso { margin: 4px 0 8px; font-size: 12px; color: var(--amber); }
+.versao-pop-grupo { margin: 10px 0 4px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-faint); }
+.versao-pop-item { display: flex; align-items: baseline; gap: 8px; padding: 3px 0; font-size: 13px; color: var(--ink); }
+.versao-pop-item.is-fora { color: var(--ink-faint); }
+.versao-pop-tag { flex: 0 0 auto; min-width: 26px; text-align: center; padding: 1px 6px; border-radius: 99px; font-size: 11px; font-weight: 700; background: var(--blue-tint); color: var(--blue); }
+.versao-pop-tag { min-width: 32px; }
+.versao-pop-tag[data-v="2"] { background: var(--green-tint); color: var(--green); }
+.versao-pop-tag[data-v="3"] { background: var(--purple-tint); color: var(--purple); }
+.versao-pop-tag[data-v="4"] { background: var(--amber-tint); color: var(--amber); }/* v1: ícone do tipo de dispositivo no filtro, só o desenho (sem pino/contorno); linhas-filhas recuadas */
+.camada-amostra.is-icone { width: 20px; height: 18px; color: var(--ink); }
+.camada-amostra.is-icone svg { width: 16px; height: 16px; display: block; }
+.camada-linha.is-filha { padding-left: 24px; }
+/* ---------- Seletor de cockpit (vários cockpits por usuário) — ver assets/cockpits.js ---------- */
+.cockpit-sel { position: relative; }
+.cockpit-sel-btn { display: inline-flex; align-items: center; gap: 6px; max-width: 220px; height: 36px; padding: 0 12px; margin-right: 6px; border: 1px solid var(--border-strong); background: var(--surface); border-radius: 999px; font: 600 13px var(--font-body); color: #404041; cursor: pointer; }
+.cockpit-sel-atual { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cockpit-sel-btn:hover { background: var(--surface-sunken); }
+.cockpit-sel-btn svg { width: 14px; height: 14px; }
+.cockpit-sel-painel { position: absolute; top: calc(100% + 10px); right: 0; width: 320px; padding: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); z-index: 950; font-family: var(--font-body); font-size: 13px; font-weight: 500; }
+.cockpit-sel-painel[hidden] { display: none; }
+.cockpit-sel-titulo { padding: 4px 8px 6px; font-size: 10.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-faint); }
+.cockpit-sel-linha { display: flex; align-items: center; gap: 4px; padding: 2px; border-radius: var(--radius-sm); }
+.cockpit-sel-linha.is-ativo { background: var(--blue-tint); }
+.cockpit-sel-nome { flex: 1; min-width: 0; text-align: left; border: 0; background: transparent; padding: 7px 8px; font: inherit; color: var(--ink); cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: var(--radius-sm); }
+.cockpit-sel-linha:not(.is-ativo):not(.is-editando) .cockpit-sel-nome:hover { background: var(--surface-sunken); }
+.cockpit-sel-linha.is-ativo .cockpit-sel-nome { font-weight: 700; }
+.cockpit-sel-mini { border: 0; background: transparent; padding: 5px 7px; font: inherit; font-size: 11.5px; color: var(--ink-muted); cursor: pointer; border-radius: var(--radius-sm); }
+.cockpit-sel-mini:hover { background: var(--surface-sunken); color: var(--ink); }
+.cockpit-sel-mini.is-perigo:hover { color: var(--red); }
+.cockpit-sel-linha.is-editando { padding: 4px 2px; }
+.cockpit-sel-linha.is-editando input { flex: 1; min-width: 0; padding: 7px 8px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font: inherit; }
+.cockpit-sel-linha.is-editando .btn-primary { padding: 7px 12px; font-size: 12.5px; }
+.cockpit-sel-novo { width: 100%; margin-top: 4px; padding: 8px; border: 1px dashed var(--border-strong); border-radius: var(--radius-sm); background: transparent; font: inherit; color: var(--ink-muted); cursor: pointer; }
+.cockpit-sel-novo:hover { background: var(--surface-sunken); color: var(--ink); }
+/* ---------- Layout: barra de cima com hambúrguer, Adicionar Widget flutuante, seletor de versão no admin ---------- */
+.app-topbar { justify-content: flex-start; }
+.app-menu-btn { margin-right: 8px; margin-left: -8px; }
+.app-topbar-logo { margin-right: auto; }
+.cockpit-toolbar-title { display: none; } /* o breadcrumb saiu: o hambúrguer e o seletor de cockpit cumprem esse papel */
+.cockpit-toolbar { justify-content: flex-end; }
+body.sem-toolbar .cockpit-toolbar { display: none; }
+body.sem-toolbar .cockpit-canvas { top: calc(16px + var(--header-h) + 16px); }
+
+.widget-library-wrap { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 880; }
+.modo-admin .widget-library-wrap { bottom: 84px; } /* acima da barra do admin */
+.widget-library-wrap > .btn-primary { display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; border-radius: 999px; box-shadow: var(--shadow-lg); }
+.widget-library-wrap > .btn-primary svg { width: 16px; height: 16px; }
+.widget-library { top: auto; bottom: calc(100% + 12px); right: auto; left: 50%; transform: translate(-50%, 6px); }
+.widget-library.is-open { transform: translate(-50%, 0); }
+
+.menu-lateral-veu { position: fixed; inset: 0; z-index: 990; background: rgba(22, 26, 32, 0.35); opacity: 0; transition: opacity 0.18s ease; }
+.menu-lateral-veu.is-aberto { opacity: 1; }
+.menu-lateral-veu[hidden], .menu-lateral[hidden] { display: none; }
+.menu-lateral { position: fixed; top: 0; left: 0; bottom: 0; z-index: 1000; width: 280px; padding: 12px; display: flex; flex-direction: column; gap: 2px; background: var(--surface); box-shadow: var(--shadow-lg); transform: translateX(-100%); transition: transform 0.2s ease; font-family: var(--font-body); }
+.menu-lateral.is-aberta { transform: none; }
+.menu-lateral-topo { display: flex; align-items: center; justify-content: space-between; padding: 4px 4px 8px 10px; font-family: var(--font-display); font-size: 15px; }
+.menu-lateral-item { text-align: left; padding: 11px 12px; border: 0; border-radius: var(--radius-md); background: transparent; font: 500 14px var(--font-body); color: var(--ink); cursor: pointer; }
+.menu-lateral-item:hover { background: var(--surface-sunken); }
+.menu-lateral-item.is-ativo { background: var(--blue-tint); color: var(--blue); font-weight: 700; }
+.menu-lateral-nota { margin: auto 8px 4px; font-size: 11.5px; color: var(--ink-faint); }
+
+/* seletor de versão dentro da barra do admin (fundo escuro) */
+.admin-dock .versao-wrap { margin-right: 0; gap: 4px; }
+.admin-dock .versao-seg { padding: 2px; background: rgba(255, 255, 255, 0.12); border: 0; border-radius: 999px; }
+.admin-dock .versao-seg button { background: transparent; padding: 4px 10px; color: #fff; font-weight: 700; }
+.admin-dock .versao-seg button:hover { background: rgba(255, 255, 255, 0.22); }
+.admin-dock .versao-seg button.is-ativa { background: #fff; color: var(--ink); }
+.admin-dock .versao-info { width: 22px; height: 22px; padding: 0; justify-content: center; }
+.admin-dock .versao-pop { top: auto; bottom: calc(100% + 18px); left: 0; right: auto; color: var(--ink); }
+/* Adicionar Widget: só o "+" no canto de baixo à direita; com o mouse (ou foco) abre e mostra "Adicionar widget" */
+.widget-library-wrap { left: auto; right: 24px; transform: none; }
+.widget-library-wrap > .btn-primary { height: 48px; min-width: 48px; padding: 0 16px; gap: 0; justify-content: center; overflow: hidden; }
+.widget-library-wrap > .btn-primary svg { width: 18px; height: 18px; }
+.fab-rotulo { max-width: 0; margin-right: 0; opacity: 0; white-space: nowrap; transition: max-width 0.2s ease, margin-right 0.2s ease, opacity 0.15s ease; }
+.widget-library-wrap > .btn-primary:hover .fab-rotulo,
+.widget-library-wrap > .btn-primary:focus-visible .fab-rotulo,
+.widget-library-wrap:has(.widget-library.is-open) .fab-rotulo { max-width: 160px; margin-right: 8px; opacity: 1; }
+.widget-library { left: auto; right: 0; transform: translateY(6px); }
+.widget-library.is-open { transform: none; }
+/* os botões de zoom/centralizar do mapa (canto de baixo à direita) sobem para não ficarem atrás do "+" */
+.leaflet-bottom.leaflet-right { margin-bottom: 64px; }
+
+/* seletor de versão: select no lugar dos botões lado a lado */
+.admin-dock .versao-select { height: 26px; padding: 0 22px 0 10px; border: 0; border-radius: 999px; background-color: rgba(255, 255, 255, 0.12); color: #fff; font: 700 12px var(--font-body); cursor: pointer; }
+.admin-dock .versao-select:hover { background-color: rgba(255, 255, 255, 0.22); }
+.admin-dock .versao-select option { color: var(--ink); background: #fff; }
+/* ---------- Seletor de alertas do mapa: Todos / Todos + alertas / Só alertas ---------- */
+.map-modo { display: inline-flex; padding: 2px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); box-shadow: var(--shadow-md); }
+.map-modo button { border: 0; background: transparent; padding: 4px 10px; border-radius: 6px; font: 600 12px var(--font-body); color: var(--ink-muted); cursor: pointer; white-space: nowrap; }
+.map-modo button:hover { color: var(--ink); background: var(--surface-sunken); }
+.map-modo button.is-on { background: var(--btn-primary); color: #fff; }
+.map-modo button:focus-visible { outline: 2px solid var(--red); outline-offset: 1px; }
+
+/* ---------- Widget Notificações (v3, teste inicial) ---------- */
+.notif-lista { list-style: none; margin: 0; padding: 0; overflow: auto; height: 100%; }
+.notif-item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.notif-item:hover { background: var(--surface-sunken); }
+.notif-acoes { flex: none; display: flex; align-items: center; gap: 4px; }
+.notif-ponto { flex: none; width: 10px; height: 10px; margin-top: 5px; border-radius: 50%; }
+.notif-loc, .notif-mais { flex: none; display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--ink-muted); cursor: pointer; }
+.notif-mais { color: var(--ink-muted); font-size: 16px; line-height: 1; padding-bottom: 4px; }
+.notif-mais:hover { color: var(--ink); background: var(--surface-sunken); }
+.notif-mais:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+.notif-menu { position: fixed; z-index: 2000; min-width: 200px; padding: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); }
+.notif-menu button { display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 8px 10px; border-radius: 6px; font: 500 13px var(--font-body); color: var(--ink); cursor: pointer; }
+.notif-menu button:hover { background: var(--surface-sunken); }
+.notif-loc svg { width: 14px; height: 14px; }
+.notif-loc:hover { background: var(--surface-sunken); color: var(--ink); }
+.notif-loc:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+.notif-corpo { flex: 0 1 46%; min-width: 0; }
+.notif-texto { font-size: 13px; color: var(--ink); }
+.notif-onde { font-size: 12px; color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.notif-hora { flex: none; display: flex; flex-direction: column; align-items: flex-end; margin-left: 8px; font-size: 11px; line-height: 1.35; color: var(--ink-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.notif-vazio { padding: 16px; font-size: 13px; color: var(--ink-muted); }
+.notif-quem { flex: 1 1 0; min-width: 0; padding-top: 1px; font-size: 12px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.notif-quem.is-sistema { font-weight: 400; color: var(--ink-muted); }
+.widget-card[data-type="notificacoes"][data-size="sm"] .notif-quem { display: none; }
+
+/* Notificações em colunas: bolinha | Tipo | Evento (+ dispositivo) | Quem | Data e hora | ações. Cabeçalho e linhas usam a mesma grade. */
+.notif-cab, .notif-item { display: grid; grid-template-columns: 10px minmax(0, 1fr) minmax(0, 1.2fr) 100px minmax(0, 1fr) 78px 56px; column-gap: 10px; align-items: start; padding: 8px 12px; }
+.notif-cab { position: sticky; top: 0; z-index: 1; align-items: center; padding-top: 6px; padding-bottom: 6px; background: var(--surface); border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 600; color: var(--ink-muted); }
+.notif-hora-cab { text-align: right; }
+.notif-tipo { font-size: 13px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.notif-corpo { flex: none; }
+.notif-hora { margin-left: 0; }
+.notif-acoes { justify-content: flex-end; }
+.widget-card[data-type="notificacoes"][data-size="sm"] .notif-cab, .widget-card[data-type="notificacoes"][data-size="sm"] .notif-item { grid-template-columns: 10px minmax(0, 1fr) minmax(0, 1fr) 92px 78px 56px; }
+.widget-card[data-type="notificacoes"][data-size="sm"] .notif-quem-cab { display: none; }
+.notif-texto { font-size: 13px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.notif-onde { font-size: 13px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Notificações — acabamento (referências de tabela limpa: cabeçalho suave, pílula de tipo, avatar em "Quem") */
+.notif-lista { background: var(--surface); }
+.notif-cab { background: var(--surface-sunken); border-bottom: 1px solid var(--border); text-transform: none; letter-spacing: 0; }
+.notif-item { align-items: center; padding-top: 10px; padding-bottom: 10px; }
+.notif-item:hover { background: var(--surface-sunken); }
+.notif-ponto { margin-top: 0; width: 9px; height: 9px; }
+.notif-texto { font-weight: 500; }
+.notif-onde { color: var(--ink-muted); }
+.notif-tipo { overflow: visible; }
+.notif-pilula { display: inline-block; max-width: 100%; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+.notif-quem { display: flex; align-items: center; gap: 8px; padding-top: 0; font-weight: 500; }
+.notif-quem-nome { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.notif-quem.is-sistema { font-weight: 400; color: var(--ink-muted); }
+.notif-hora { align-items: flex-end; }
+.notif-hora span:first-child { color: var(--ink-muted); }
+.notif-hora span:last-child { color: var(--ink); font-weight: 500; }
+.notif-cab, .notif-item { padding-left: 20px; padding-right: 20px; }
+
+/* Notificações enxuta (v3): bolinha | Evento + cruzamento | Data e hora | ações. Sem Tipo e sem Quem (o tipo fica na cor da bolinha). */
+.notif-cab, .notif-item, .widget-card[data-type="notificacoes"][data-size="sm"] .notif-cab, .widget-card[data-type="notificacoes"][data-size="sm"] .notif-item { grid-template-columns: 10px minmax(0, 1fr) 72px 30px; column-gap: 8px; padding-left: 14px; padding-right: 10px; }
+.notif-corpo { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.notif-onde { font-size: 12px; }
+
+/* Card de totais clicado (recorte dele aplicado no mapa): marcado até clicar de novo */
+.totais-body.is-selecionado, .totais-body.is-selecionado:hover { background: var(--red-tint); box-shadow: inset 0 0 0 2px var(--red); }
+
+/* Clique de mouse numa subárea/corredor não desenha o retângulo preto de foco do navegador (teclado continua com o anel) */
+.leaflet-container path.leaflet-interactive:focus:not(:focus-visible) { outline: none; }
