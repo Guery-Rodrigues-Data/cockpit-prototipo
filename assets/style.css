@@ -297,6 +297,11 @@ a { color: inherit; }
   cursor: grab;
 }
 .widget-header:active { cursor: grabbing; }
+.widget-card[data-type="mapa"] .widget-header { background: #1565c0; }
+.widget-card[data-type="mapa"] .widget-header .widget-title,
+.widget-card[data-type="mapa"] .widget-header .widget-drag,
+.widget-card[data-type="mapa"] .widget-header .widget-icon-btn { color: #fff; }
+.widget-card[data-type="mapa"] .widget-header .widget-icon-btn:hover { background: rgba(255, 255, 255, 0.18); }
 .widget-drag {
   display: flex; align-items: center; justify-content: center;
   width: 14px; flex-shrink: 0; color: var(--border-strong);

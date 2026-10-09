@@ -1,7 +1,7 @@
 $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add("http://localhost:8746/")
 $listener.Start()
-$root = "C:\Users\guery.braga\Documents\prototipos\cockpit-prototipo"
+$root = $PSScriptRoot
 Write-Host "Cockpit prototipo em http://localhost:8746/"
 
 while ($listener.IsListening) {
